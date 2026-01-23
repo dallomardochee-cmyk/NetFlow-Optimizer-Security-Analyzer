@@ -1,4 +1,3 @@
-#include <windows.h>
 #include <stdio.h>
 #include "graphe.h"
 #include "dijkstra.h"
@@ -7,17 +6,16 @@
 #include "backtracking.h"
 #include "simulation.h"
 
+// Prototypes
 void analyser_connectivite(Graphe* g, int depart);
 void lancer_dijkstra(Graphe* g, int s, int d);
 void lancer_backtracking(Graphe* g, int src, int dest, float bp_min, float cout_max);
 void afficher_graphe_complet(Graphe* g);
 void generer_dot(Graphe* g, const char* nom_fichier);
-void simuler_flux_avance(Graphe* g, int source, int destination, int nb_paquets);
 
 int main() {
     int choix = 0;
-    int src = 0, dest = 0; 
-    int n_paquets = 0;
+    int src = 0, dest = 0 , sec = 0; 
     float bp_min = 0.0, cout_max = 0.0;
     Graphe* g = NULL;
     char path[100]; 
@@ -25,7 +23,7 @@ int main() {
     while (1) {
         menu();
         if (scanf("%d", &choix) != 1) break;
-        if (choix == 11) break; // Modifié pour correspondre à une option de sortie propre
+        if (choix == 0) break; // Sortie propre du programme
 
         switch (choix) {
             case 1:
@@ -40,7 +38,8 @@ int main() {
                 break;
 
             case 2:
-                afficher_graphe_complet(g);
+                if (g) afficher_graphe_complet(g);
+                else printf("Erreur : Chargez un reseau.\n");
                 break;    
 
             case 3: 
@@ -50,54 +49,55 @@ int main() {
                     printf("Entrez le noeud source (0 a %d) : ", g->nb_noeuds - 1);
                     
                     if (scanf("%d", &src) != 1) {
-                        printf("Entree invalide.\n");
                         while(getchar() != '\n'); 
                         break;
                     }
 
                     if (src < 0 || src >= g->nb_noeuds) {
-                        printf("\033[1;31m[ERREUR]\033[0m Le noeud %d n'existe pas.\n", src);
+                        printf("\033[1;31m[ERREUR]\033[0m Noeud inexistant.\n");
                     } else {
+                        // 1. On vérifie d'abord la portée (Connectivité)
                         analyser_connectivite(g, src);
-                        
+
+                        // 2. On demande si on veut le détail de l'itinéraire
                         do {
-                            printf("\nSouhaitez-vous calculer un itineraire ? (1: Oui / 0: Non) : ");
-                            
-                            // Si l'utilisateur tape une lettre au lieu d'un chiffre
+                            printf("\nCalculer un itineraire ? (1: Oui / 0: Non) : ");
                             if (scanf("%d", &confirmer) != 1) {
-                                printf("\033[1;31m[ERREUR]\033[0m Veuillez entrer un chiffre (1 ou 0).\n");
-                                while(getchar() != '\n'); // Vide le buffer pour éviter la boucle infinie
-                                confirmer = -1; // Force la répétition de la boucle
+                                while(getchar() != '\n');
+                                confirmer = -1;
                                 continue;
                             }
-
-                            if (confirmer != 1 && confirmer != 0) {
-                                printf("\033[1;33m[!] Choix invalide.\033[0m Merci d'entrer uniquement 1 pour OUI ou 0 pour NON.\n");
-                            }
-
                         } while (confirmer != 1 && confirmer != 0);
+                        
                         if (confirmer == 1) {
-                            printf("Entrez le noeud destination (0 a %d) : ", g->nb_noeuds - 1);
-                            scanf("%d", &dest);
-                            if (dest >= 0 && dest < g->nb_noeuds) {
+                            printf("Destination (0 a %d) : ", g->nb_noeuds - 1);
+                            if (scanf("%d", &dest) != 1) {
+                                printf("\033[1;31m[ERREUR]\033[0m Saisie invalide.\n");
+                                while(getchar() != '\n');
+                            } else if (dest >= 0 && dest < g->nb_noeuds) {
                                 lancer_dijkstra(g, src, dest); 
-                            } 
-                           } 
-                       }
-                   }
-                else {
-                    printf("Erreur : Veuillez charger le reseau d'abord.\n");
+                            } else {
+                                printf("\033[1;31m[ERREUR]\033[0m Destination hors limites.\n");
+                            }
+                        }
+                    } 
+                } else {
+                    printf("\033[1;31m[ERREUR]\033[0m Chargez un reseau avant l'analyse.\n");
                 }
                 break;
 
             case 4:
-                if (g) { printf("Source : "); scanf("%d", &src); bellman_ford(g, src); }
-                else { printf("Erreur : Veuillez charger le reseau d'abord.\n"); }
+                if (g) {
+                    printf("Source : "); scanf("%d", &src);
+                    printf("Destination : "); scanf("%d", &dest); // On a besoin de la cible !
+                    bellman_ford(g, src, dest); 
+                } else {
+                    printf("Erreur : Chargez un reseau.\n");
+                }
                 break;
-
             case 5:
                 if (g) analyser_securite(g);
-                else printf("Erreur : Veuillez charger le reseau d'abord.\n");
+                else printf("Erreur : Chargez un reseau.\n");
                 break;
 
             case 6:
@@ -106,52 +106,123 @@ int main() {
                     printf("Destination : "); scanf("%d", &dest);
                     printf("BP minimum : "); scanf("%f", &bp_min);
                     printf("Cout maximum : "); scanf("%f", &cout_max);
+                    printf("Securité minimale : "); scanf("%d", &sec);
                     lancer_backtracking(g, src, dest, bp_min, cout_max);
-                }
-                else printf("Erreur : Veuillez charger le reseau d'abord.\n");
+                } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
-            case 7:
+            case 7: // Simulation corrigée
                 if (g) {
-                    printf("Noeud source : "); scanf("%d", &src);
-                    printf("Noeud destination : "); scanf("%d", &dest);
-                    printf("Nombre de paquets a envoyer : "); scanf("%d", &n_paquets);
-                    simuler_flux_avance(g, src, dest, n_paquets);
-                }
-                else printf("Erreur : Veuillez charger le reseau d'abord.\n");
+                    float taux;
+                    int n_pqts;
+                    printf("Noeud Source : "); scanf("%d", &src);
+                    printf("Noeud Destination : "); scanf("%d", &dest);
+                    printf("Taux d'arrivee (0.1 a 1.0) : "); scanf("%f", &taux);
+                    printf("Nombre de paquets : "); scanf("%d", &n_pqts);
+                    simuler_flux_avance(g, src, dest, n_pqts, taux);
+                } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
             case 8:
                 if (g) { 
                     mesurer_performance_memoire(g); 
                     analyser_topologie(g); 
-                }
-                else { printf("Erreur : Veuillez charger le reseau d'abord.\n"); }
+                } else printf("Erreur : Chargez un reseau.\n");
                 break;
             
             case 9: 
-                sauvegarder_graphe(g, "data/sauvegarde_topo.txt");
-                printf("Graphe sauvegarde.\n"); 
-                break; 
-                
-           case 10:
                 if (g) {
-                    char nom_fich[100];
-                    char nom_complet[110];
-
-                    printf("Entrez le nom du fichier de sortie (ex: mon_reseau) : ");
+                    sauvegarder_graphe(g, "data/sauvegarde_topo.txt");
+                    printf("Graphe sauvegarde.\n"); 
+                } break; 
+                
+            case 10:
+                if (g) {
+                    char nom_fich[100], nom_complet[110];
+                    printf("Nom du fichier DOT (sans extension) : ");
                     scanf("%s", nom_fich);
-
-                    // On ajoute l'extension .dot automatiquement pour plus de sécurité
                     sprintf(nom_complet, "%s.dot", nom_fich);
-
                     generer_dot(g, nom_complet);
+                    printf("\033[1;32m[OK]\033[0m Genere : %s\n", nom_complet);
+                } else printf("Erreur : Chargez un reseau.\n");
+                break;
+
+            case 11: // Suppression Noeud
+                if (g) {
+                    int id;
+                    printf("ID du noeud a supprimer : ");
+                    scanf("%d", &id);
                     
-                    printf("\n\033[1;32m[SUCCES]\033[0m Fichier genere : %s\n", nom_complet);
-                    printf("Utilisez un visualiseur Graphviz pour ouvrir ce fichier.\n");
+                    if (id < 0 || id >= g->nb_noeuds) {
+                        printf("\033[1;31m[ERREUR]\033[0m Noeud inexistant.\n");
+                                        } else {
+                        // Afficher les liens avant suppression
+                        printf("\033[1;33m[SYSTEM]\033[0m Liens isoles du noeud %d :\n", id);
+                        
+                        // Afficher les arêtes sortantes
+                        Arete* aretes_sortantes = g->noeuds[id].aretes;
+                        while (aretes_sortantes != NULL) {
+                            printf("  - %d -> %d (Latence: %.2f, BP: %.2f, Cout: %.2f)\n", 
+                                id, aretes_sortantes->destination, aretes_sortantes->latence, 
+                                aretes_sortantes->bande_passante, aretes_sortantes->cout);
+                            aretes_sortantes = aretes_sortantes->suivant;
+                        }
+                        
+                        // Afficher les arêtes entrantes
+                        for (int i = 0; i < g->nb_noeuds; i++) {
+                            if (i != id) {
+                                Arete* aretes_entrantes = g->noeuds[i].aretes;
+                                while (aretes_entrantes != NULL) {
+                                    if (aretes_entrantes->destination == id) {
+                                        printf("  - %d -> %d (Latence: %.2f, BP: %.2f, Cout: %.2f)\n", 
+                                            i, id, aretes_entrantes->latence, 
+                                            aretes_entrantes->bande_passante, aretes_entrantes->cout);
+                                    }
+                                    aretes_entrantes = aretes_entrantes->suivant;
+                                }
+                            }
+                        }
+                        
+                        supprimer_noeud(g, id);
+                        printf("\033[1;32m[OK]\033[0m Noeud %d supprime avec ses liens.\n", id);
+                    }
+                } else printf("Erreur : Chargez un reseau.\n");
+                break;
+
+            case 12: // Suppression Arete
+                if (g) {
+                    int s, d;
+                    printf("Source du lien : "); scanf("%d", &s);
+                    printf("Destination du lien : "); scanf("%d", &d);
+                    supprimer_arete(g, s, d);
+                    supprimer_arete(g, d, s);
+                    printf("\033[1;32m[OK]\033[0m Liaison %d <-> %d supprimee.\n", s, d);
+                } else printf("Erreur : Chargez un reseau.\n");
+                break;
+
+            case 13: // Ajout Noeud
+                if (g) {
+                    int nouveau_id = g->nb_noeuds;
+                    agrandir_graphe(g, g->nb_noeuds + 1);
+                    printf("\033[1;32m[OK]\033[0m Noeud %d cree.\n", nouveau_id);
                 } else {
-                    printf("\033[1;31m[ERREUR]\033[0m Chargez un reseau d'abord (Option 1).\n");
+                    g = creer_graphe(1); // Si aucun graphe n'existe
+                    printf("\033[1;32m[OK]\033[0m Premier noeud (ID: 0) cree.\n");
                 }
+                break;
+
+            case 14: // Ajout Arete
+                if (g) {
+                    int s, d, sec;
+                    float lat, bp, c;
+                    printf("Source : "); scanf("%d", &s);
+                    printf("Destination : "); scanf("%d", &d);
+                    printf("Latence : "); scanf("%f", &lat);
+                    printf("BP : "); scanf("%f", &bp);
+                    printf("Cout : "); scanf("%f", &c);
+                    printf("Securite (1-10) : "); scanf("%d", &sec);
+                    ajouter_arete(g, s, d, lat, bp, c, sec);
+                } else printf("Erreur : Chargez un reseau.\n");
                 break;
         }
     }

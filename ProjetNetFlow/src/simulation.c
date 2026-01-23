@@ -1,95 +1,117 @@
 #include "simulation.h"
 #include "graphe.h"
+#include "liste_chainee.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-FilePriorite* init_file() {
-    FilePriorite* f = malloc(sizeof(FilePriorite));
+// 1. Initialisation : Utilisation du nom FileAttente conforme au .h
+FileAttente* init_file(int capacite) {
+    FileAttente* f = malloc(sizeof(FileAttente));
+    if (!f) return NULL;
     f->tete = f->queue = NULL;
-    f->nb_paquets = 0;
+    f->taille_actuelle = 0;
+    f->capacite_max = capacite;
     return f;
 }
 
-// Insertion avec priorité O(n) dans une liste doublement chaînée
-void enqueue_paquet(FilePriorite* f, int id, int prio, float taille) {
-    Paquet* n = malloc(sizeof(Paquet));
-    n->id = id; n->priorite = prio; n->taille = taille;
-    n->suiv = n->prec = NULL;
+// 2. ENQUEUE : Corrigé pour utiliser FileAttente et les bons noms de champs
+void enqueue_paquet(FileAttente* f, int id, int prio, float taille, int cycle) {
+    Paquet* nouveau = malloc(sizeof(Paquet));
+    if (!nouveau) return;
+    
+    nouveau->id = id;
+    nouveau->priorite = prio;
+    nouveau->taille_Mo = taille;
+    nouveau->cycle_arrivee = cycle; // Utilisation du champ ajouté dans le .h
+    nouveau->suivant = nouveau->precedent = NULL;
 
-    if (!f->tete) {
-        f->tete = f->queue = n;
+    if (f->tete == NULL) {
+        f->tete = f->queue = nouveau;
     } else {
-        Paquet* curr = f->tete;
-        while (curr && curr->priorite >= prio) curr = curr->suiv;
-        
-        if (!curr) { // Fin de file
-            n->prec = f->queue;
-            f->queue->suiv = n;
-            f->queue = n;
-        } else if (curr == f->tete) { // Début de file
-            n->suiv = f->tete;
-            f->tete->prec = n;
-            f->tete = n;
-        } else { // Milieu
-            n->suiv = curr;
-            n->prec = curr->prec;
-            curr->prec->suiv = n;
-            curr = n;
+        Paquet* courant = f->tete;
+        // Priorité élevée (1) placée en début de file
+        while (courant && courant->priorite <= prio) {
+            courant = courant->suivant;
+        }
+
+        if (courant == f->tete) { 
+            nouveau->suivant = f->tete;
+            f->tete->precedent = nouveau;
+            f->tete = nouveau;
+        } else if (courant == NULL) { 
+            nouveau->precedent = f->queue;
+            f->queue->suivant = nouveau;
+            f->queue = nouveau;
+        } else { 
+            nouveau->suivant = courant;
+            nouveau->precedent = courant->precedent;
+            courant->precedent->suivant = nouveau;
+            courant->precedent = nouveau;
         }
     }
-    f->nb_paquets++;
+    f->taille_actuelle++;
 }
 
-Paquet* dequeue_paquet(FilePriorite* f) {
-    if (!f->tete) return NULL;
+// 3. DEQUEUE : Extraction O(1)
+Paquet* dequeue_paquet(FileAttente* f) {
+    if (!f || !f->tete) return NULL;
+
     Paquet* temp = f->tete;
-    f->tete = f->tete->suiv;
-    if (f->tete) f->tete->prec = NULL;
+    f->tete = f->tete->suivant;
+    if (f->tete) f->tete->precedent = NULL;
     else f->queue = NULL;
-    f->nb_paquets--;
+
+    f->taille_actuelle--;
     return temp;
 }
 
-void simuler_flux_avance(Graphe* g, int source, int destination, int nb_paquets) {
-    if (!g) return;
+// 4. SIMULATION : Correction de la signature (void) et de la logique
+void simuler_flux_avance(Graphe* g, int source, int destination, int nb_paquets, float taux_arrivee) {
+    if (!g) {
+        printf("\033[1;31m[ERREUR]\033[0m Graphe non charge.\n");
+        return;
+    }
 
-    // Simulation simplifiée basée sur le chemin le plus rapide (Dijkstra)
-    // On récupère la bande passante critique (le lien le plus faible du chemin)
-    float bp_min_chemin = 500.0; // Valeur par défaut si pas de chemin
-    float latence_totale = 45.0; 
+    FileAttente* file = init_file(50);
+    int paquets_generes = 0, paquets_traites = 0, paquets_perdus = 0;
+    long temps_attente_total = 0;
+    int cycle = 0;
 
-    printf("\n\033[1;35m--- SIMULATION DE FLUX AVANCEE (%d paquets) ---\033[0m\n", nb_paquets);
-    
-    int paquets_transmis = 0;
-    int paquets_perdus = 0;
-    int paquets_en_attente = 0;
+    printf("\n\033[1;35m--- SIMULATION DYNAMIQUE : %d -> %d ---\033[0m\n", source, destination);
 
-    // Seuil de congestion (exemple : 70% de la BP min du chemin)
-    float capacite_max = bp_min_chemin * 0.7; 
-
-    for (int i = 1; i <= nb_paquets; i++) {
-        if (i <= capacite_max) {
-            paquets_transmis++;
-        } else if (i <= bp_min_chemin) {
-            paquets_en_attente++; // Le lien sature, on commence à stocker dans le buffer
-        } else {
-            paquets_perdus++; // Le buffer (file d'attente) deborde
+    while ((paquets_generes < nb_paquets || file->taille_actuelle > 0) && cycle < 3000) {
+        // ARRIVÉE
+        if (paquets_generes < nb_paquets) {
+            if (((float)rand() / (float)RAND_MAX) < taux_arrivee) {
+                if (file->taille_actuelle < file->capacite_max) {
+                    // Correction : on appelle enqueue_paquet avec les bons paramètres
+                    enqueue_paquet(file, paquets_generes + 1, rand() % 10 + 1, 1.5, cycle);
+                } else {
+                    paquets_perdus++;
+                }
+                paquets_generes++; 
+            }
         }
+
+        // TRAITEMENT
+        if (file->taille_actuelle > 0) {
+            Paquet* p = dequeue_paquet(file);
+            if (p) {
+                temps_attente_total += (cycle - p->cycle_arrivee);
+                paquets_traites++;
+                free(p);
+            }
+        }
+        cycle++;
     }
 
-    // Calcul des statistiques
-    float taux_perte = ((float)paquets_perdus / nb_paquets) * 100;
-
-    printf("Resultats de la simulation :\n");
-    printf("  [OK]  Transmis sans delai : %d\n", paquets_transmis);
-    printf("  [WNG] En attente (Buffer)  : %d (Latence +%.1fms)\n", paquets_en_attente, latence_totale * 0.5);
-    printf("  [ERR] Paquets PERDUS      : %d\n", paquets_perdus);
-    printf("----------------------------------------------\n");
-    printf("Taux de perte : \033[1;%s%.2f%%\033[0m\n", (taux_perte > 5 ? "31m" : "32m"), taux_perte);
+    // Statistiques finales... (ton code d'affichage est correct)
+    printf(">> Simulation terminee en %d cycles.\n", cycle);
     
-    if (taux_perte > 10.0) {
-        printf("\033[1;31m[DIAGNOSTIC] Reseau sature. Augmentez la Bande Passante des liens critiques.\033[0m\n");
-    } else {
-        printf("\033[1;32m[DIAGNOSTIC] Flux fluide. QoS respectee.\033[0m\n");
+    // Nettoyage final
+    while(file->tete) {
+        Paquet* p = dequeue_paquet(file);
+        free(p);
     }
+    free(file);
 }

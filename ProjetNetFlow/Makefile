@@ -1,14 +1,14 @@
-
 # Nom de l'exécutable final
 TARGET = NetFlow_Sim.exe
 
 # Compilateur
 CC = gcc
 
-# Options de compilation : 
-# -Isrc : cherche les headers dans le dossier src
-# -Wall : affiche tous les avertissements pour coder proprement
-CFLAGS = -Isrc -Wall
+# Options de compilation 
+# -lm : lie la bibliothèque mathématique (pour sqrt, pow, etc.)
+# -g  : ajoute les symboles de débogage (utile pour gdb ou valgrind)
+CFLAGS = -Isrc -Wall -g
+LDFLAGS = -lm
 
 # Liste de TOUS les fichiers sources
 SRCS = src/main.c \
@@ -20,20 +20,23 @@ SRCS = src/main.c \
        src/liste_chainee.c \
        src/simulation.c
 
-# Transformation automatique des .c en .o (fichiers objets)
+# Transformation automatique des .c en .o
 OBJS = $(SRCS:.c=.o)
 
-# Règle par défaut : compile tout
+# Règle par défaut
 all: $(TARGET)
 
-# Liaison des fichiers objets pour créer l'exécutable
+# Liaison des fichiers objets
 $(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $(TARGET)
+	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
 # Règle pour compiler chaque fichier .c en .o
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Règle pour nettoyer les fichiers objets et l'exécutable
+# Règle pour nettoyer
 clean:
 	rm -f src/*.o $(TARGET)
+
+# Empêche les conflits avec des fichiers nommés 'clean' ou 'all'
+.PHONY: all clean

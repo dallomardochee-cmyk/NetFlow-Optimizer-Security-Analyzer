@@ -1,22 +1,16 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
-typedef struct Paquet {
-    int id;
-    int priorite;
-    float taille; // en Ko
-    struct Paquet *prec, *suiv;
-} Paquet;
+// INDISPENSABLE : Le compilateur doit savoir ce qu'est un 'Graphe'
+#include "graphe.h" 
+#include "liste_chainee.h"
 
-typedef struct {
-    Paquet* tete;
-    Paquet* queue;
-    int nb_paquets;
-} FilePriorite;
+// Prototypes des fonctions de file (utilisant FileAttente de liste_chainee.h)
+FileAttente* init_file(int capacite);
+void enqueue_paquet(FileAttente* f, int id, int prio, float taille, int cycle);
+Paquet* dequeue_paquet(FileAttente* f);
 
-FilePriorite* init_file();
-void enqueue_paquet(FilePriorite* f, int id, int prio, float taille);
-Paquet* dequeue_paquet(FilePriorite* f);
-void simuler_flux(int nb_a_simuler);
+// Signature de la simulation (Graphe est maintenant reconnu grâce à l'include plus haut)
+void simuler_flux_avance(Graphe* g, int source, int destination, int nb_paquets, float taux_arrivee);
 
 #endif

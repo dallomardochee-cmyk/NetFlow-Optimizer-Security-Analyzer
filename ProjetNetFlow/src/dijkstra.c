@@ -1,6 +1,6 @@
-#include <windows.h> 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "dijkstra.h"
 
 // --- Gestion du Tas Binaire (Min-Heap) ---
@@ -40,8 +40,8 @@ ElementHeap pop(MinHeap* h) {
     return res;
 }
 
-// Fonction pour remonter le chemin 
 void afficher_chemin_rec(int* parent, int j) {
+    if (j == -1) return; // Sécurité
     if (parent[j] == -1) {
         printf("%d", j);
         return;
@@ -50,91 +50,113 @@ void afficher_chemin_rec(int* parent, int j) {
     printf(" -> %d", j);
 }
 
-// --- Algorithme de Dijkstra (Haute Précision) ---
-void lancer_dijkstra(Graphe* g, int src, int dest) {
-    LARGE_INTEGER frequency;
-    LARGE_INTEGER start, end;
+// --- 1. Algorithme de Dijkstra (Renommé correctement) ---
+void lancer_dijkstra(Graphe* g, int source, int destination) {
+    float* dist = malloc(g->nb_noeuds * sizeof(float));
+    int* parent = malloc(g->nb_noeuds * sizeof(int));
     
-    // Initialisation du compteur haute performance
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&start);
-
-    // Initialisation des distances
-    float* dist = (float*)malloc(g->nb_noeuds * sizeof(float));
-    int* parent = (int*)malloc(g->nb_noeuds * sizeof(int));
+    clock_t start = clock();
+    
     for (int i = 0; i < g->nb_noeuds; i++) {
         dist[i] = 1e9;
         parent[i] = -1;
     }
-    dist[src] = 0;
+    dist[source] = 0;
 
-
-    MinHeap* h = init_heap(g->nb_noeuds * 4);
-    push(h, src, 0);
+    MinHeap* h = init_heap(g->nb_noeuds * 10); // Augmenter capacité pour sécurité
+    push(h, source, 0);
 
     while (h->size > 0) {
         ElementHeap e = pop(h);
         int u = e.id;
-        if (u == dest) break;
 
-        for (Arete* a = g->tab_noeuds[u].liste_adjacence; a; a = a->suivant) {
-            if (dist[u] + a->latence < dist[a->destination]) {
-                dist[a->destination] = dist[u] + a->latence;
-                parent[a->destination] = u;
-                push(h, a->destination, dist[a->destination]);
+        if (u == destination) break;
+        if (e.dist > dist[u]) continue;
+
+        for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+            int v = a->destination;
+            if (dist[u] + a->latence < dist[v]) {
+                dist[v] = dist[u] + a->latence;
+                parent[v] = u;
+                push(h, v, dist[v]);
             }
         }
     }
 
-    QueryPerformanceCounter(&end);
-    
-    // Calcul du temps en millisecondes avec les QuadPart (entiers 64 bits)
-    double temps_ms = (double)(end.QuadPart - start.QuadPart) * 1000.0 / (double)frequency.QuadPart;
+    clock_t end = clock();
+    double temps_ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
 
     printf("\n\033[1;32m[PERFORMANCE DIJKSTRA]\033[0m");
     printf("\n>> Temps CPU : \033[1;33m%.5f ms\033[0m", temps_ms);
     
-    if (dist[dest] >= 1e9) {
-        printf("\n>> Statut : Destination inaccessible.\n");
+    if (dist[destination] >= 1e9) {
+        printf("\n>> Statut : Destination [%d] inaccessible.\n", destination);
     } else {
         printf("\n>> Chemin : "); 
-        afficher_chemin_rec(parent, dest);
-        printf("\n>> Cout minimal (Latence) : %.2f ms\n", dist[dest]);
+        afficher_chemin_rec(parent, destination);
+        printf("\n>> Latence totale : %.2f ms\n", dist[destination]);
     }
 
-    free(dist);
-    free(parent); 
-    free(h->data);
-    free(h);
+    free(dist); free(parent); free(h->data); free(h);
 }
 
-// --- Algorithme de Bellman-Ford (Haute Précision) ---
-void bellman_ford(Graphe* g, int src) {
-    LARGE_INTEGER frequency;
-    LARGE_INTEGER start, end;
-    
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&start);
+// --- 2. Algorithme de Bellman-Ford ---
+void bellman_ford(Graphe* g, int source, int dest) {
+    if (!g || source < 0 || source >= g->nb_noeuds) return;
 
+    clock_t start = clock();
     float* dist = (float*)malloc(g->nb_noeuds * sizeof(float));
-    for (int i = 0; i < g->nb_noeuds; i++) dist[i] = 1e9;
-    dist[src] = 0;
+    int* parent = (int*)malloc(g->nb_noeuds * sizeof(int));
 
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        dist[i] = 1e9;
+        parent[i] = -1;
+    }
+    dist[source] = 0;
+
+    // Relaxation V-1 fois
     for (int i = 1; i < g->nb_noeuds; i++) {
+        int changement = 0;
         for (int u = 0; u < g->nb_noeuds; u++) {
-            for (Arete* a = g->tab_noeuds[u].liste_adjacence; a; a = a->suivant) {
-                if (dist[u] != 1e9 && dist[u] + a->latence < dist[a->destination])
+            if (dist[u] == 1e9) continue;
+            for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+                if (dist[u] + a->latence < dist[a->destination]) {
                     dist[a->destination] = dist[u] + a->latence;
+                    parent[a->destination] = u;
+                    changement = 1;
+                }
+            }
+        }
+        if (!changement) break;
+    }
+
+    // Détection cycles négatifs
+    int cycle_negatif = 0;
+    for (int u = 0; u < g->nb_noeuds; u++) {
+        if (dist[u] == 1e9) continue;
+        for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+            if (dist[u] + a->latence < dist[a->destination]) {
+                cycle_negatif = 1;
+                break;
             }
         }
     }
 
-    QueryPerformanceCounter(&end);
-    double temps_ms = (double)(end.QuadPart - start.QuadPart) * 1000.0 / (double)frequency.QuadPart;
+    clock_t end = clock();
+    double temps_ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
 
     printf("\n\033[1;32m[PERFORMANCE BELLMAN-FORD]\033[0m");
     printf("\n>> Temps CPU : \033[1;33m%.5f ms\033[0m", temps_ms);
-    printf("\n>> Statut : Verification terminee.");
-    printf("\n>> Info : Toutes les routes depuis le noeud %d ont ete calculees.", src);
-    free(dist);
+
+    if (cycle_negatif) {
+        printf("\n\033[1;31m>> STATUT : ALERTE ! Cycle de poids negatif detecte.\033[0m");
+    } else if (dist[dest] == 1e9) {
+        printf("\n>> Destination %d non atteinte.\n", dest);
+    } else {
+        printf("\n>> Chemin : ");
+        afficher_chemin_rec(parent, dest);
+        printf("\n>> Latence totale : %.2f ms\n", dist[dest]);
+    }
+
+    free(dist); free(parent);
 }

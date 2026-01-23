@@ -1,18 +1,32 @@
 #ifndef LISTE_CHAINEE_H
 #define LISTE_CHAINEE_H
 
-typedef struct Arete {
-    int destination;
-    float latence;
-    float bande_passante;
-    float cout;
-    int securite;
-    struct Arete* suivant; // Le pointeur vers l'élément suivant
-} Arete;
+#include <stdio.h>
+#include <stdlib.h>
 
-// Prototypes pour manipuler la liste
-Arete* creer_arete(int dest, float lat, float bp, float cout, int sec);
-void inserer_en_tete(Arete** liste, Arete* nouvelle);
-void liberer_liste(Arete* liste);
+// Définition unique du Paquet
+typedef struct Paquet {
+    int id;
+    int priorite;
+    float taille_Mo;
+    int source;
+    int destination;
+    int cycle_arrivee; 
+    struct Paquet* precedent;
+    struct Paquet* suivant;
+} Paquet;
+
+typedef struct {
+    Paquet *tete;
+    Paquet *queue;
+    int taille_actuelle;
+    int capacite_max;
+} FileAttente;
+
+FileAttente* initialiser_file(int capacite_max);
+int enqueue(FileAttente *file, int id, int priorite, float taille, int cycle);
+Paquet* dequeue(FileAttente *file);
+Paquet* peek(FileAttente *file);
+void liberer_file(FileAttente *file);
 
 #endif

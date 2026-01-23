@@ -2,61 +2,74 @@
 #include <stdlib.h>
 #include "graphe.h"
 
-// Variable pour savoir si on a trouve au moins une solution
+// Variables pour stocker la meilleure solution trouvée
+float meilleure_latence = 1e9;
+int meilleur_trajet[100];
+int taille_meilleur = 0;
 int trouve = 0;
 
-// Fonction de recherche récursive
 void backtracking_recursive(Graphe* g, int u, int dest, float bp_min, float cout_max, 
-                            float cout_accumule, int* visite, int* chemin, int etape) {
+                            float cout_acc, float lat_acc, int* visite, int* chemin, int etape) {
     
-    // 1. SECURITÉ : Si on a déjà trouvé un chemin ou si c'est trop profond, on arrête
-    if (trouve || etape >= g->nb_noeuds) return;
+    // 1. ÉLAGAGE (Pruning) : Si la latence actuelle est déjà pire que le record, on arrête.
+    // C'est ce qui rend l'algorithme "intelligent".
+    if (lat_acc >= meilleure_latence || cout_acc > cout_max) return;
 
-    // 2. CONDITION DE RÉUSSITE : On est arrivé au noeud destination
+    // 2. CONDITION DE RÉUSSITE : On a atteint la destination
     if (u == dest) {
         trouve = 1;
-        printf("\n\033[1;32m[SUCCES] Chemin trouve sous contraintes :\033[0m\n");
-        printf("   Trajet : ");
-        for (int i = 0; i < etape; i++) {
-            printf("%d%s", chemin[i], (i == etape - 1 ? "" : " -> "));
-        }
-        printf("\n   Cout total : %.2f | BP min respectee : %.2f\n", cout_accumule, bp_min);
+        meilleure_latence = lat_acc;
+        taille_meilleur = etape;
+        for (int i = 0; i < etape; i++) meilleur_trajet[i] = chemin[i];
         return;
     }
 
-    // 3. MARQUAGE : On marque le noeud actuel comme visité pour ce chemin
     visite[u] = 1;
 
-    // 4. EXPLORATION des voisins
-    for (Arete* a = g->tab_noeuds[u].liste_adjacence; a; a = a->suivant) {
-        int v = a->destination;
+    // 3. EXPLORATION DES VOISINS
+   for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+    int v = a->destination;
 
-        // ÉLAGAGE : On n'y va que si :
-        // - Pas encore visité (évite les boucles infinies)
-        // - La BP est suffisante
-        // - Le coût cumulé ne dépasse pas la limite
-        if (!visite[v] && a->bande_passante >= bp_min && (cout_accumule + a->cout) <= cout_max) {
+        // ÉLAGAGE AVANCÉ :
+        // - Pas encore visité
+        // - Bande passante suffisante
+        // - Coût total respecté
+        // - Nœud sécurisé (on exclut ici les niveaux de sécurité < 3)
+        if (!visite[v] && a->bande_passante >= bp_min && (cout_acc + a->cout) <= cout_max && a->securite >= 3) {
             chemin[etape] = v;
-            backtracking_recursive(g, v, dest, bp_min, cout_max, cout_accumule + a->cout, visite, chemin, etape + 1);
+            backtracking_recursive(g, v, dest, bp_min, cout_max, 
+                                   cout_acc + a->cout, lat_acc + a->latence, 
+                                   visite, chemin, etape + 1);
         }
     }
 
-    // 5. BACKTRACKING : On libère le noeud pour permettre d'autres explorations
+    // 4. BACKTRACK : On libère le nœud pour d'autres combinaisons
     visite[u] = 0;
 }
 
-// Fonction principale appelée par le main
 void lancer_backtracking(Graphe* g, int src, int dest, float bp_min, float cout_max) {
     int* visite = calloc(g->nb_noeuds, sizeof(int));
     int* chemin = malloc(g->nb_noeuds * sizeof(int));
     
-    trouve = 0; // Reset de la variable globale
-    chemin[0] = src; // Le premier pas est la source
+    // Reset des variables globales pour chaque nouvelle recherche
+    trouve = 0;
+    meilleure_latence = 1e9;
+    taille_meilleur = 0;
+    chemin[0] = src;
 
-    backtracking_recursive(g, src, dest, bp_min, cout_max, 0.0, visite, chemin, 1);
+    printf("\n\033[1;36m[BACKTRACKING] Recherche du chemin optimal sous contraintes...\033[0m\n");
 
-    if (!trouve) {
-        printf("\n\033[1;31m[ECHEC]\033[0m Aucun chemin ne respecte ces contraintes (BP >= %.1f, Cout <= %.1f).\n", bp_min, cout_max);
+    backtracking_recursive(g, src, dest, bp_min, cout_max, 0.0, 0.0, visite, chemin, 1);
+
+    if (trouve) {
+        printf("\n\033[1;32m[SUCCES] Meilleur chemin trouve :\033[0m\n");
+        printf("   Trajet : ");
+        for (int i = 0; i < taille_meilleur; i++) {
+            printf("%d%s", meilleur_trajet[i], (i == taille_meilleur - 1 ? "" : " -> "));
+        }
+        printf("\n   Latence Totale : %.2f ms | Cout : %.2f\n", meilleure_latence, cout_max);
+    } else {
+        printf("\n\033[1;31m[ECHEC]\033[0m Aucun chemin ne satisfait les contraintes (BP >= %.1f, Secu >= 3).\n", bp_min);
     }
 
     free(visite);

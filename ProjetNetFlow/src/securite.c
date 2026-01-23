@@ -1,15 +1,18 @@
-#include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>      // Pour la portabilité du chrono
+#include "graphe.h"
 #include "securite.h"
 
-// Algorithme récursif pour trouver les points d'articulation (Tarjan)
+// Algorithme de Tarjan pour trouver les points d'articulation et les ponts
 void dfs_articulation(Graphe* g, int u, int v[], int d[], int l[], int p[], int* t, int art[]) {
     int enfants = 0;
     v[u] = 1;
     d[u] = l[u] = ++(*t);
 
-    Arete* a = g->tab_noeuds[u].liste_adjacence;
+    // Correction : tab_noeuds -> noeuds | liste_adjacence -> aretes
+    Arete* a = g->noeuds[u].aretes;
+    
     while (a) {
         int destination = a->destination;
         if (!v[destination]) {
@@ -17,25 +20,30 @@ void dfs_articulation(Graphe* g, int u, int v[], int d[], int l[], int p[], int*
             p[destination] = u;
             dfs_articulation(g, destination, v, d, l, p, t, art);
 
-            // Vérifie si le sous-arbre de 'destination' a une connexion vers un ancêtre de 'u'
+            // Mise à jour du "low link"
             if (l[destination] < l[u]) l[u] = l[destination];
 
-            // Cas 1 : u est la racine et a plus d'un enfant
-            if (p[u] == -1 && enfants > 1) art[u] = 1;
-            // Cas 2 : u n'est pas la racine et low value de l'enfant >= discovery value de u
-            if (p[u] != -1 && l[destination] >= d[u]) art[u] = 1;
+            // --- DETECTION DES PONTS (Liaisons critiques) ---
+            if (l[destination] > d[u]) {
+                printf("\033[1;33m[ALERTE PONT]\033[0m Liaison critique : %d <-> %d (Coupure fatale)\n", u, destination);
+            }
+
+            // --- DETECTION DES POINTS D'ARTICULATION ---
+            if (p[u] == -1 && enfants > 1) art[u] = 1; // Racine avec >1 fils
+            if (p[u] != -1 && l[destination] >= d[u]) art[u] = 1; // Noeud interne
         } 
         else if (destination != p[u]) {
+            // Mise à jour pour les arêtes de retour (Back-edges)
             if (d[destination] < l[u]) l[u] = d[destination];
         }
-        a = a->suivant;
+        a = a->suivant; // INDISPENSABLE : Ne pas oublier d'avancer dans la liste !
     }
 }
+
 void analyser_securite(Graphe* g) {
-    // Mesure Haute Précision
-    LARGE_INTEGER frequency, start, end;
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&start);
+    if (!g) return;
+
+    clock_t start = clock();
 
     int n = g->nb_noeuds;
     int *v = calloc(n, sizeof(int));
@@ -47,31 +55,31 @@ void analyser_securite(Graphe* g) {
 
     for (int i = 0; i < n; i++) p[i] = -1;
 
-    // Lancement du DFS sur tous les composants du réseau
+    printf("\n\033[1;31m[AUDIT DE FIABILITE - ALGORITHME DE TARJAN]\033[0m\n");
+
     for (int i = 0; i < n; i++) {
         if (!v[i]) dfs_articulation(g, i, v, d, l, p, &t, art);
     }
 
-    QueryPerformanceCounter(&end);
-    double temps_ms = (double)(end.QuadPart - start.QuadPart) * 1000.0 / (double)frequency.QuadPart;
+    clock_t end = clock();
+    double temps_ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
 
-    printf("\n\033[1;31m[AUDIT DE FIABILITE - DFS]\033[0m");
-    printf("\n>> Temps d'analyse : \033[1;33m%.5f ms\033[0m", temps_ms);
+    printf(">> Temps d'analyse : \033[1;33m%.5f ms\033[0m", temps_ms);
     
     int count = 0;
     for (int i = 0; i < n; i++) {
         if (art[i]) {
-            printf("\n\033[1;31m[ALERTE SPOF]\033[0m Noeud %d est un point critique de defaillance.", i);
+            printf("\n\033[1;31m[ALERTE SPOF]\033[0m Noeud %d est un point critique (Routeur pivot).", i);
             count++;
         }
     }
 
     if (count == 0) {
-        printf("\n>> Statut : Reseau hautement resilient (aucun point critique).");
+        printf("\n>> Statut : \033[1;32mReseau hautement resilient\033[0m (Maillage optimal).");
     } else {
-        printf("\n>> Total : %d vulnerabilite(s) detectee(s).", count);
+        printf("\n>> Statut : \033[1;31mReseau vulnerable\033[0m (%d routeurs critiques detectes).", count);
     }
-    printf("\n");
+    printf("\n---------------------------------------------\n");
 
     free(v); free(d); free(l); free(p); free(art);
 }
