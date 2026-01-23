@@ -4,6 +4,7 @@
 #include "graphe.h"
 #include "securite.h"
 
+// ========== ALGORITHME DE TARJAN (DFS) ==========
 // Algorithme de Tarjan pour trouver les points d'articulation et les ponts
 void dfs_articulation(Graphe* g, int u, int v[], int d[], int l[], int p[], int* t, int art[]) {
     int enfants = 0;
@@ -36,6 +37,7 @@ void dfs_articulation(Graphe* g, int u, int v[], int d[], int l[], int p[], int*
             // Mise à jour pour les arêtes de retour (Back-edges)
             if (d[destination] < l[u]) l[u] = d[destination];
         }
+// ========== FONCTION PRINCIPALE D'AUDIT ==========
         a = a->suivant; // INDISPENSABLE : Ne pas oublier d'avancer dans la liste !
     }
 }

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 Arete* creer_arete(int dest, float lat, float bp, float cout, int sec) {
+// ========== CREATION D'ARETE ==========
     Arete* n = (Arete*)malloc(sizeof(Arete));
     if (n) {
         n->destination = dest;
@@ -14,6 +15,7 @@ Arete* creer_arete(int dest, float lat, float bp, float cout, int sec) {
         n->suivant = NULL;
     }
     return n;
+// ========== INITIALISATION DE FILE ==========
 }
 
 FileAttente* initialiser_file(int capacite_max) {
@@ -23,6 +25,7 @@ FileAttente* initialiser_file(int capacite_max) {
     file->taille_actuelle = 0;
     file->capacite_max = capacite_max;
     return file;
+// ========== ENQUEUE: INSERTION AVEC PRIORITE ==========
 }
 
 // Opération : enqueue (Insertion avec priorité O(n))
@@ -65,6 +68,7 @@ int enqueue(FileAttente *file, int id, int priorite, float taille, int cycle) {
         }
         courant->suivant = nouveau;
     }
+// ========== DEQUEUE: EXTRACTION O(1) ==========
 
     file->taille_actuelle++;
     return 1;
@@ -79,10 +83,12 @@ Paquet* dequeue(FileAttente *file) {
 
     if (file->tete != NULL) {
         file->tete->precedent = NULL;
+// ========== PEEK: CONSULTATION SANS SUPPRESSION ==========
     } else {
         file->queue = NULL;
     }
 
+// ========== INSERTION EN TETE DE LISTE ==========
     file->taille_actuelle--;
     return p;
 }
@@ -90,6 +96,7 @@ Paquet* dequeue(FileAttente *file) {
 // Opération : peek (Consultation sans suppression O(1))
 Paquet* peek(FileAttente *file) {
     return file->tete;
+// ========== LIBERATION DE LISTE ==========
 }
 
 void inserer_en_tete(Arete** liste, Arete* nouvelle) {

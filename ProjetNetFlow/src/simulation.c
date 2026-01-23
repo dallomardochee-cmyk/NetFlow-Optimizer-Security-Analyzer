@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 // 1. Initialisation : Utilisation du nom FileAttente conforme au .h
+// ========== INITIALISATION DE LA FILE ==========
 FileAttente* init_file(int capacite) {
     FileAttente* f = malloc(sizeof(FileAttente));
     if (!f) return NULL;
@@ -14,6 +15,7 @@ FileAttente* init_file(int capacite) {
     return f;
 }
 
+// ========== ENQUEUE: AJOUT AVEC PRIORITE ==========
 // 2. ENQUEUE : Corrigé pour utiliser FileAttente et les bons noms de champs
 void enqueue_paquet(FileAttente* f, int id, int prio, float taille, int cycle) {
     Paquet* nouveau = malloc(sizeof(Paquet));
@@ -52,6 +54,7 @@ void enqueue_paquet(FileAttente* f, int id, int prio, float taille, int cycle) {
     f->taille_actuelle++;
 }
 
+// ========== DEQUEUE: EXTRACTION DU PLUS PRIORITAIRE ==========
 // 3. DEQUEUE : Extraction O(1)
 Paquet* dequeue_paquet(FileAttente* f) {
     if (!f || !f->tete) return NULL;
@@ -63,6 +66,7 @@ Paquet* dequeue_paquet(FileAttente* f) {
 
     f->taille_actuelle--;
     return temp;
+// ========== SIMULATION PRINCIPALE DE FLUX ==========
 }
 
 // 4. SIMULATION : Correction de la signature (void) et de la logique

@@ -14,18 +14,21 @@ void afficher_graphe_complet(Graphe* g);
 void generer_dot(Graphe* g, const char* nom_fichier);
 
 int main() {
+    // ========== DECLARATIONS GLOBALES ET VARIABLES ==========
     int choix = 0;
     int src = 0, dest = 0 , sec = 0; 
     float bp_min = 0.0, cout_max = 0.0;
     Graphe* g = NULL;
-    char path[100]; 
+    char path[100];
 
+    // ========== BOUCLE PRINCIPALE DU MENU ==========
     while (1) {
         menu();
         if (scanf("%d", &choix) != 1) break;
         if (choix == 0) break; // Sortie propre du programme
 
         switch (choix) {
+            // ========== CASE 1: CHARGEMENT DU RESEAU ==========
             case 1:
                 printf("Chemin du fichier (ex: data/reseau_reel.txt) : ");
                 scanf("%s", path);
@@ -37,11 +40,13 @@ int main() {
                 else printf("\033[1;31m[ERREUR] Impossible d'ouvrir %s\033[0m\n", path);
                 break;
 
+            // ========== CASE 2: AFFICHAGE DU RESEAU ==========
             case 2:
                 if (g) afficher_graphe_complet(g);
                 else printf("Erreur : Chargez un reseau.\n");
                 break;    
 
+            // ========== CASE 3: ANALYSE CONNECTIVITE ET DIJKSTRA ==========
             case 3: 
                 if (g) {
                     int confirmer;
@@ -86,6 +91,7 @@ int main() {
                 }
                 break;
 
+            // ========== CASE 4: BELLMAN-FORD ==========
             case 4:
                 if (g) {
                     printf("Source : "); scanf("%d", &src);
@@ -95,11 +101,13 @@ int main() {
                     printf("Erreur : Chargez un reseau.\n");
                 }
                 break;
+            // ========== CASE 5: AUDIT DE SECURITE ==========
             case 5:
                 if (g) analyser_securite(g);
                 else printf("Erreur : Chargez un reseau.\n");
                 break;
 
+            // ========== CASE 6: BACKTRACKING OPTIMISE ==========
             case 6:
                 if (g) {
                     printf("Source : "); scanf("%d", &src);
@@ -111,6 +119,7 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
+            // ========== CASE 7: SIMULATION DE FLUX ==========
             case 7: // Simulation corrigée
                 if (g) {
                     float taux;
@@ -123,6 +132,7 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
+            // ========== CASE 8: RAPPORT DE PERFORMANCE ==========
             case 8:
                 if (g) { 
                     mesurer_performance_memoire(g); 
@@ -130,12 +140,14 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
             
+            // ========== CASE 9: SAUVEGARDE ==========
             case 9: 
                 if (g) {
                     sauvegarder_graphe(g, "data/sauvegarde_topo.txt");
                     printf("Graphe sauvegarde.\n"); 
                 } break; 
                 
+            // ========== CASE 10: EXPORT DOT ==========
             case 10:
                 if (g) {
                     char nom_fich[100], nom_complet[110];
@@ -147,6 +159,7 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
+            // ========== CASE 11: SUPPRESSION NOEUD ==========
             case 11: // Suppression Noeud
                 if (g) {
                     int id;
@@ -189,6 +202,7 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
+            // ========== CASE 12: SUPPRESSION ARETE ==========
             case 12: // Suppression Arete
                 if (g) {
                     int s, d;
@@ -200,6 +214,7 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
 
+            // ========== CASE 13: AJOUT NOEUD ==========
             case 13: // Ajout Noeud
                 if (g) {
                     int nouveau_id = g->nb_noeuds;
@@ -211,6 +226,7 @@ int main() {
                 }
                 break;
 
+            // ========== CASE 14: AJOUT ARETE ==========
             case 14: // Ajout Arete
                 if (g) {
                     int s, d, sec;

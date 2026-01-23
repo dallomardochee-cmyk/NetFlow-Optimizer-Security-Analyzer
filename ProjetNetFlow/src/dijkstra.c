@@ -3,6 +3,7 @@
 #include <time.h>
 #include "dijkstra.h"
 
+// ========== GESTION DU TAS BINAIRE (MIN-HEAP) ==========
 // --- Gestion du Tas Binaire (Min-Heap) ---
 MinHeap* init_heap(int cap) {
     MinHeap* h = (MinHeap*)malloc(sizeof(MinHeap));
@@ -48,6 +49,7 @@ void afficher_chemin_rec(int* parent, int j) {
     }
     afficher_chemin_rec(parent, parent[j]);
     printf(" -> %d", j);
+// ========== ALGORITHME DIJKSTRA (PLUS COURT CHEMIN) ==========
 }
 
 // --- 1. Algorithme de Dijkstra (Renommé correctement) ---
@@ -96,6 +98,7 @@ void lancer_dijkstra(Graphe* g, int source, int destination) {
         afficher_chemin_rec(parent, destination);
         printf("\n>> Latence totale : %.2f ms\n", dist[destination]);
     }
+// ========== ALGORITHME BELLMAN-FORD (DETECTION CYCLES) ==========
 
     free(dist); free(parent); free(h->data); free(h);
 }

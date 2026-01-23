@@ -1,6 +1,7 @@
 #include "utils.h"
 #include <stdio.h>
 
+// ========== MENU PRINCIPAL ==========
 void menu() {
     printf("\n\033[1;36m================================================\033[0m");
     printf("\n   \033[1mNETFLOW OPTIMIZER - INNOVATION SYSTEM\033[0m");

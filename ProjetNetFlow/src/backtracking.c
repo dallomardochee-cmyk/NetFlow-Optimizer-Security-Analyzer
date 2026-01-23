@@ -3,12 +3,14 @@
 #include "graphe.h"
 
 // Variables pour stocker la meilleure solution trouvée
+// ========== VARIABLES GLOBALES ==========
 float meilleure_latence = 1e9;
 int meilleur_trajet[100];
 int taille_meilleur = 0;
 int trouve = 0;
 
 void backtracking_recursive(Graphe* g, int u, int dest, float bp_min, float cout_max, 
+// ========== FONCTION RECURSIVE AVEC ELAGAGE ==========
                             float cout_acc, float lat_acc, int* visite, int* chemin, int etape) {
     
     // 1. ÉLAGAGE (Pruning) : Si la latence actuelle est déjà pire que le record, on arrête.
@@ -47,6 +49,7 @@ void backtracking_recursive(Graphe* g, int u, int dest, float bp_min, float cout
     visite[u] = 0;
 }
 
+// ========== FONCTION PRINCIPALE DE BACKTRACKING ==========
 void lancer_backtracking(Graphe* g, int src, int dest, float bp_min, float cout_max) {
     int* visite = calloc(g->nb_noeuds, sizeof(int));
     int* chemin = malloc(g->nb_noeuds * sizeof(int));
