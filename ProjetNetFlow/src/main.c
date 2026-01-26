@@ -9,7 +9,6 @@
 // Prototypes
 void analyser_connectivite(Graphe* g, int depart);
 void lancer_dijkstra(Graphe* g, int s, int d);
-void lancer_backtracking(Graphe* g, int src, int dest, float bp_min, float cout_max);
 void afficher_graphe_complet(Graphe* g);
 void generer_dot(Graphe* g, const char* nom_fichier);
 
@@ -110,15 +109,18 @@ int main() {
             // ========== CASE 6: BACKTRACKING OPTIMISE ==========
             case 6:
                 if (g) {
-                    printf("Source : "); scanf("%d", &src);
-                    printf("Destination : "); scanf("%d", &dest);
-                    printf("BP minimum : "); scanf("%f", &bp_min);
-                    printf("Cout maximum : "); scanf("%f", &cout_max);
-                    printf("Securité minimale : "); scanf("%d", &sec);
-                    lancer_backtracking(g, src, dest, bp_min, cout_max);
-                } else printf("Erreur : Chargez un reseau.\n");
+                    // Ajout d'un espace avant % pour "nettoyer" le buffer
+                    printf("Source : ");           scanf(" %d", &src);
+                    printf("Destination : ");      scanf(" %d", &dest);
+                    printf("BP minimum : ");       scanf(" %f", &bp_min);
+                    printf("Cout maximum : ");     scanf(" %f", &cout_max);
+                    printf("Securité minimale : "); scanf(" %d", &sec);
+                    
+                    lancer_backtracking(g, src, dest, bp_min, cout_max, sec);
+                } else {
+                    printf("Erreur : Chargez un reseau.\n");
+                }
                 break;
-
             // ========== CASE 7: SIMULATION DE FLUX ==========
             case 7: // Simulation corrigée
                 if (g) {
