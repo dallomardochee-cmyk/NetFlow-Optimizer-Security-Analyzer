@@ -1,18 +1,16 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
+// INDISPENSABLE : Le compilateur doit savoir ce qu'est un 'Graphe'
+#include "graphe.h" 
 #include "liste_chainee.h"
 
-/**
- * @brief Lance une simulation de flux de paquets
- * Génère des paquets aléatoires, les enfile, et les traite.
- * Affiche des statistiques à la fin.
- *
- * @param nb_cycles Nombre d'itérations de la simulation
- * @param capacite_file Capacité maximale de la file d'attente
- * @param taux_arrivee Probabilité d'arrivée d'un paquet par cycle (0.0 - 1.0)
- */
-void lancer_simulation_flux(int nb_cycles, int capacite_file,
-                            float taux_arrivee);
+// Prototypes des fonctions de file (utilisant FileAttente de liste_chainee.h)
+FileAttente* init_file(int capacite);
+void enqueue_paquet(FileAttente* f, int id, int prio, float taille, int cycle);
+Paquet* dequeue_paquet(FileAttente* f);
 
-#endif // SIMULATION_H
+// Signature de la simulation (Graphe est maintenant reconnu grâce à l'include plus haut)
+void simuler_flux_avance(Graphe* g, int source, int destination, int nb_paquets, float taux_arrivee);
+
+#endif

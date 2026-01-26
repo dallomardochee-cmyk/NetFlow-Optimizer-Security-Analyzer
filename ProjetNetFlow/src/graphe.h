@@ -2,105 +2,53 @@
 #define GRAPHE_H
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "liste_chainee.h"
+#include <time.h> // Pour srand
 
-// Définition des structures comme demandé
+#define TOTAL_NOEUDS_GEN 550
 
-/**
- * @brief Structure représentant une arête du graphe
- */
-typedef struct Arete
-{
-    int destination;       // ID du nœud destination
-    float latence;         // Latence en ms
-    float bande_passante;  // Bande passante en Mbps
-    float cout;            // Coût en unités monétaires
-    int securite;          // Niveau de sécurité (0-10)
-    struct Arete *suivant; // Pointeur vers l'arête suivante (liste chaînée)
+typedef struct Arete {
+    int destination;
+    float latence;
+    float bande_passante;
+    float cout;
+    int securite;
+    struct Arete* suivant;
 } Arete;
 
-/**
- * @brief Structure représentant un nœud du graphe
- */
-typedef struct Noeud
-{
-    int id;        // Identifiant unique du nœud
-    char nom[50];  // Nom du nœud (ex: "Routeur_A")
-    Arete *aretes; // Liste d'adjacence des arêtes partantes
+typedef struct {
+    int id;
+    char nom[50];
+    Arete* aretes; // Liste d'adjacence
 } Noeud;
 
-/**
- * @brief Structure principale du graphe
- */
-typedef struct Graphe
-{
-    int nb_noeuds;             // Nombre total de nœuds
-    int capacite_noeuds;       // Capacité actuelle du tableau de nœuds
-    Noeud *noeuds;             // Tableau dynamique de nœuds
-    float **matrice_adjacence; // Matrice d'adjacence (optionnelle, pour graphes denses)
-    int est_oriente;           // 1 si orienté, 0 sinon
+typedef struct {
+    int nb_noeuds;
+    int capacite;
+    int est_oriente;
+    Noeud* noeuds;
+    float** matrice_adjacence; // Matrice pour accès rapide O(1)
 } Graphe;
 
-// Prototypes des fonctions
+Arete* creer_arete(int dest, float lat, float bp, float cout, int sec);
+void inserer_en_tete(Arete** liste, Arete* nouvelle);
+Graphe* creer_graphe(int nb_noeuds);
+void ajouter_noeud(Graphe* g);
+void ajouter_arete(Graphe* g, int src, int dest, float lat, float bp, float cout, int sec);
+void supprimer_noeud(Graphe* g, int id_noeud);
+void supprimer_arete(Graphe* g, int src, int dest);
+void agrandir_graphe(Graphe* g, int nouvelle_capacite);
+Graphe* charger_depuis_fichier(const char* nom_fichier);
+void analyser_connectivite(Graphe* g, int depart);
+void liberer_graphe(Graphe* g);
+void sauvegarder_graphe(Graphe* g, const char* nom_fichier);
 
-/**
- * @brief Crée un nouveau graphe vide
- * @param capacite_initiale Nombre de nœuds initial à allouer
- * @param est_oriente 1 pour un graphe orienté, 0 pour non-orienté
- * @return Pointeur vers le Graphe créé
- */
-Graphe *creer_graphe(int capacite_initiale, int est_oriente);
+void analyser_topologie(Graphe* g);
+void mesurer_performance_memoire(Graphe* g); 
 
-/**
- * @brief Libère toute la mémoire associée au graphe
- * @param graphe Le graphe à détruire
- */
-void liberer_graphe(Graphe *graphe);
+// Prototype de la fonction de génération
+void generer_reseau_geant();
+void generer_aretes_fichier(FILE *f, int start, int end, int target_start, int target_end, 
+                            float lat_min, float lat_max, float bw_min, float bw_max, int rel_min);
 
-/**
- * @brief Ajoute un nœud au graphe
- * @param graphe Le graphe cible
- * @param id Identifiant du nœud
- * @param nom Nom du nœud
- */
-void ajouter_noeud(Graphe *graphe, int id, const char *nom);
-
-/**
- * @brief Ajoute une arête entre deux nœuds
- * @param graphe Le graphe cible
- * @param source ID du nœud source
- * @param destination ID du nœud destination
- * @param latence Latence de la connexion
- * @param bande_passante Bande passante disponible
- * @param cout Coût de la liaison
- * @param securite Niveau de sécurité
- */
-void ajouter_arete(Graphe *graphe, int source, int destination, float latence, float bande_passante, float cout, int securite);
-
-/**
- * @brief Supprime un nœud du graphe (et toutes ses arêtes)
- * @param graphe Le graphe cible
- * @param id ID du nœud à supprimer
- * @return 1 si succès, 0 si nœud non trouvé
- * @complexity O(V + E) - parcourt tous les nœuds et arêtes
- */
-int supprimer_noeud(Graphe *graphe, int id);
-
-/**
- * @brief Supprime une arête entre deux nœuds
- * @param graphe Le graphe cible
- * @param source ID du nœud source
- * @param destination ID du nœud destination
- * @return 1 si succès, 0 si arête non trouvée
- * @complexity O(V + deg(source)) - recherche linéaire
- */
-int supprimer_arete(Graphe *graphe, int source, int destination);
-
-/**
- * @brief Affiche le graphe (pour le débogage)
- * @param graphe Le graphe à afficher
- */
-void afficher_graphe(const Graphe *graphe);
-
-#endif // GRAPHE_H
+#endif

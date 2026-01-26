@@ -1,139 +1,165 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include "dijkstra.h"
 
-ResultatChemin *dijkstra(const Graphe *graphe, int source) {
-  if (!graphe)
-    return NULL;
+// ========== GESTION DU TAS BINAIRE (MIN-HEAP) ==========
+// --- Gestion du Tas Binaire (Min-Heap) ---
+MinHeap* init_heap(int cap) {
+    MinHeap* h = (MinHeap*)malloc(sizeof(MinHeap));
+    h->data = (ElementHeap*)malloc(cap * sizeof(ElementHeap));
+    h->size = 0;
+    return h;
+}
 
-  if (!graphe)
-    return NULL;
+void swap(ElementHeap* a, ElementHeap* b) {
+    ElementHeap t = *a;
+    *a = *b;
+    *b = t;
+}
 
-  // On utilise la capacité max car les IDs peuvent aller jusqu'à max
-  // Pour être sûr, on va allouer en fonction de l'ID max trouvé dans le graphe
-  // + 1.
-
-  int max_id = -1;
-  for (int i = 0; i < graphe->nb_noeuds; i++) {
-    if (graphe->noeuds[i].id > max_id)
-      max_id = graphe->noeuds[i].id;
-  }
-  int t = max_id + 1;
-
-  ResultatChemin *res = (ResultatChemin *)malloc(sizeof(ResultatChemin));
-  res->distances = (float *)malloc(t * sizeof(float));
-  res->precesseurs = (int *)malloc(t * sizeof(int));
-  res->nb_noeuds = t;
-  res->source = source;
-
-  // Initialisation
-  for (int i = 0; i < t; i++) {
-    res->distances[i] = FLT_MAX;
-    res->precesseurs[i] = -1;
-  }
-
-  // Vérifier si la source existe (ou est dans les bornes)
-  if (source >= t) {
-    fprintf(stderr, "Erreur Dijkstra: Source %d hors limites\n", source);
-    return res; // Retourne tableau init à INF
-  }
-
-  res->distances[source] = 0.0;
-
-  // File de priorité
-  ElementDijkstra *file = NULL;
-  file = enfiler_dijkstra(file, source, 0.0);
-
-  while (file) {
-    int u;
-    float dist_u;
-    file = defiler_dijkstra(file, &u, &dist_u);
-
-    // Si on a trouvé un chemin plus court ailleurs entre temps
-    if (dist_u > res->distances[u])
-      continue;
-
-    // Trouver le nœud u dans le graphe pour avoir ses arêtes
-    // Attention: graphe->noeuds est un tableau, on doit trouver l'index
-    // correspondant à l'ID u. Optimisation: si graphe->noeuds[i].id == i, c'est
-    // direct. Sinon recherche linéaire. Dans utils.c on a supposé ID
-    // quelconque. On va faire une recherche linéaire. (Pourrait être optimisé
-    // par une hashmap ou indexation directe si contrainte respectée).
-
-    int index_u = -1;
-    for (int i = 0; i < graphe->nb_noeuds; i++) {
-      if (graphe->noeuds[i].id == u) {
-        index_u = i;
-        break;
-      }
+void push(MinHeap* h, int id, float d) {
+    h->data[h->size] = (ElementHeap){id, d};
+    int i = h->size++;
+    while (i > 0 && h->data[i].dist < h->data[(i-1)/2].dist) {
+        swap(&h->data[i], &h->data[(i-1)/2]);
+        i = (i-1)/2;
     }
+}
 
-    if (index_u == -1)
-      continue; // Nœud pas dans la liste des nœuds actifs?
+ElementHeap pop(MinHeap* h) {
+    ElementHeap res = h->data[0];
+    h->data[0] = h->data[--h->size];
+    int i = 0;
+    while (2*i+1 < h->size) {
+        int j = 2*i+1;
+        if (j+1 < h->size && h->data[j+1].dist < h->data[j].dist) j++;
+        if (h->data[i].dist <= h->data[j].dist) break;
+        swap(&h->data[i], &h->data[j]);
+        i = j;
+    }
+    return res;
+}
 
-    Arete *arete = graphe->noeuds[index_u].aretes;
-    while (arete) {
-      int v = arete->destination;
-      float p = arete->latence; // On optimise la Latence par défaut selon
-                                // l'énoncé principal
+void afficher_chemin_rec(int* parent, int j) {
+    if (j == -1) return; // Sécurité
+    if (parent[j] == -1) {
+        printf("%d", j);
+        return;
+    }
+    afficher_chemin_rec(parent, parent[j]);
+    printf(" -> %d", j);
+// ========== ALGORITHME DIJKSTRA (PLUS COURT CHEMIN) ==========
+}
 
-      // Vérifier bornes v
-      if (v < t) {
-        if (res->distances[u] + p < res->distances[v]) {
-          res->distances[v] = res->distances[u] + p;
-          res->precesseurs[v] = u;
-          file = enfiler_dijkstra(file, v, res->distances[v]);
+// --- 1. Algorithme de Dijkstra (Renommé correctement) ---
+void lancer_dijkstra(Graphe* g, int source, int destination) {
+    float* dist = malloc(g->nb_noeuds * sizeof(float));
+    int* parent = malloc(g->nb_noeuds * sizeof(int));
+    
+    clock_t start = clock();
+    
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        dist[i] = 1e9;
+        parent[i] = -1;
+    }
+    dist[source] = 0;
+
+    MinHeap* h = init_heap(g->nb_noeuds * 10); // Augmenter capacité pour sécurité
+    push(h, source, 0);
+
+    while (h->size > 0) {
+        ElementHeap e = pop(h);
+        int u = e.id;
+
+        if (u == destination) break;
+        if (e.dist > dist[u]) continue;
+
+        for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+            int v = a->destination;
+            if (dist[u] + a->latence < dist[v]) {
+                dist[v] = dist[u] + a->latence;
+                parent[v] = u;
+                push(h, v, dist[v]);
+            }
         }
-      }
-      arete = arete->suivant;
     }
-  }
 
-  return res;
+    clock_t end = clock();
+    double temps_ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
+
+    printf("\n\033[1;32m[PERFORMANCE DIJKSTRA]\033[0m");
+    printf("\n>> Temps CPU : \033[1;33m%.5f ms\033[0m", temps_ms);
+    
+    if (dist[destination] >= 1e9) {
+        printf("\n>> Statut : Destination [%d] inaccessible.\n", destination);
+    } else {
+        printf("\n>> Chemin : "); 
+        afficher_chemin_rec(parent, destination);
+        printf("\n>> Latence totale : %.2f ms\n", dist[destination]);
+    }
+// ========== ALGORITHME BELLMAN-FORD (DETECTION CYCLES) ==========
+
+    free(dist); free(parent); free(h->data); free(h);
 }
 
-void afficher_chemin(const ResultatChemin *res, int destination) {
-  if (!res)
-    return;
-  if (destination >= res->nb_noeuds || res->distances[destination] == FLT_MAX) {
-    printf("Pas de chemin trouvé vers le nœud %d\n", destination);
-    return;
-  }
+// --- 2. Algorithme de Bellman-Ford ---
+void bellman_ford(Graphe* g, int source, int dest) {
+    if (!g || source < 0 || source >= g->nb_noeuds) return;
 
-  printf("Chemin vers %d (Latence: %.2f ms) : ", destination,
-         res->distances[destination]);
+    clock_t start = clock();
+    float* dist = (float*)malloc(g->nb_noeuds * sizeof(float));
+    int* parent = (int*)malloc(g->nb_noeuds * sizeof(int));
 
-  // Reconstruction du chemin (backtracking des prédécesseurs)
-  // On peut utiliser une récursion ou une pile temporaire
-  // Utilisons un tableau temporaire car la profondeur est bornée par nb_noeuds
-  int *chemin = (int *)malloc(res->nb_noeuds * sizeof(int));
-  int count = 0;
-  int curr = destination;
-
-  while (curr != -1) {
-    chemin[count++] = curr;
-    if (curr == res->source)
-      break;
-    curr = res->precesseurs[curr];
-
-    // Sécurité boucle infinie
-    if (count > res->nb_noeuds) {
-      printf(" (Erreur boucle dans chemin) ");
-      break;
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        dist[i] = 1e9;
+        parent[i] = -1;
     }
-  }
+    dist[source] = 0;
 
-  for (int i = count - 1; i >= 0; i--) {
-    printf("%d", chemin[i]);
-    if (i > 0)
-      printf(" -> ");
-  }
-  printf("\n");
-  free(chemin);
-}
+    // Relaxation V-1 fois
+    for (int i = 1; i < g->nb_noeuds; i++) {
+        int changement = 0;
+        for (int u = 0; u < g->nb_noeuds; u++) {
+            if (dist[u] == 1e9) continue;
+            for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+                if (dist[u] + a->latence < dist[a->destination]) {
+                    dist[a->destination] = dist[u] + a->latence;
+                    parent[a->destination] = u;
+                    changement = 1;
+                }
+            }
+        }
+        if (!changement) break;
+    }
 
-void liberer_resultat_chemin(ResultatChemin *res) {
-  if (!res)
-    return;
-  free(res->distances);
-  free(res->precesseurs);
-  free(res);
+    // Détection cycles négatifs
+    int cycle_negatif = 0;
+    for (int u = 0; u < g->nb_noeuds; u++) {
+        if (dist[u] == 1e9) continue;
+        for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+            if (dist[u] + a->latence < dist[a->destination]) {
+                cycle_negatif = 1;
+                break;
+            }
+        }
+    }
+
+    clock_t end = clock();
+    double temps_ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
+
+    printf("\n\033[1;32m[PERFORMANCE BELLMAN-FORD]\033[0m");
+    printf("\n>> Temps CPU : \033[1;33m%.5f ms\033[0m", temps_ms);
+
+    if (cycle_negatif) {
+        printf("\n\033[1;31m>> STATUT : ALERTE ! Cycle de poids negatif detecte.\033[0m");
+    } else if (dist[dest] == 1e9) {
+        printf("\n>> Destination %d non atteinte.\n", dest);
+    } else {
+        printf("\n>> Chemin : ");
+        afficher_chemin_rec(parent, dest);
+        printf("\n>> Latence totale : %.2f ms\n", dist[dest]);
+    }
+
+    free(dist); free(parent);
 }

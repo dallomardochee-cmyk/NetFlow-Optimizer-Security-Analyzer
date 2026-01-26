@@ -1,422 +1,494 @@
 #include "graphe.h"
+#include <stdlib.h>
+#include <string.h>
 
-Graphe *creer_graphe(int capacite_initiale, int est_oriente)
-{
-  if (capacite_initiale <= 0)
-    capacite_initiale = 10;
 
-  Graphe *graphe = (Graphe *)malloc(sizeof(Graphe));
-  if (!graphe)
-  {
-    perror("Erreur d'allocation du graphe");
-    exit(EXIT_FAILURE);
-  }
+Graphe* creer_graphe(int nb_noeuds) {
+    // 1. Allocation de la structure principale
+    Graphe* g = (Graphe*)malloc(sizeof(Graphe));
+    if (!g) return NULL;
 
-  graphe->nb_noeuds = 0;
-  graphe->capacite_noeuds = capacite_initiale;
-  graphe->est_oriente = est_oriente;
-  graphe->noeuds = (Noeud *)calloc(capacite_initiale, sizeof(Noeud));
+    g->nb_noeuds = nb_noeuds;
 
-  // Initialisation de la matrice d'adjacence
-  // Allocation dynamique d'un tableau de pointeurs
-  graphe->matrice_adjacence =
-      (float **)malloc(capacite_initiale * sizeof(float *));
-  if (graphe->matrice_adjacence)
-  {
-    for (int i = 0; i < capacite_initiale; i++)
-    {
-      graphe->matrice_adjacence[i] =
-          (float *)malloc(capacite_initiale * sizeof(float));
-      // Init à -1 ou INF pour dire "pas d'arête"
-      for (int j = 0; j < capacite_initiale; j++)
-        graphe->matrice_adjacence[i][j] = -1.0;
+    // 2. Allocation du tableau de Noeuds (conformément au typedef : Noeud* noeuds)
+    g->noeuds = (Noeud*)malloc(nb_noeuds * sizeof(Noeud));
+    if (!g->noeuds) {
+        free(g);
+        return NULL;
     }
-  }
+    
+    // 3. Allocation de la matrice d'adjacence
+    g->matrice_adjacence = (float**)malloc(nb_noeuds * sizeof(float*));
+    
+    for (int i = 0; i < nb_noeuds; i++) {
+        // Initialisation du Noeud
+        g->noeuds[i].id = i;
+        sprintf(g->noeuds[i].nom, "Routeur_%d", i);
+        g->noeuds[i].aretes = NULL; // Remplace liste_adjacence par aretes
 
-  if (!graphe->noeuds)
-  {
-    perror("Erreur d'allocation des nœuds");
-    free(graphe);
-    exit(EXIT_FAILURE);
-  }
-
-  return graphe;
-}
-
-void liberer_graphe(Graphe *graphe)
-{
-  if (!graphe)
-    return;
-
-  // Libérer les arêtes pour chaque nœud
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    Arete *courante = graphe->noeuds[i].aretes;
-    while (courante)
-    {
-      Arete *a_supprimer = courante;
-      courante = courante->suivant;
-      free(a_supprimer);
-    }
-  }
-
-  // Libérer le tableau de nœuds
-  free(graphe->noeuds);
-
-  // Libérer la matrice d'adjacence
-  if (graphe->matrice_adjacence)
-  {
-    for (int i = 0; i < graphe->capacite_noeuds; i++)
-    {
-      free(graphe->matrice_adjacence[i]);
-    }
-    free(graphe->matrice_adjacence);
-  }
-
-  free(graphe);
-}
-
-void ajouter_noeud(Graphe *graphe, int id, const char *nom)
-{
-  if (!graphe)
-    return;
-
-  // Vérifier si redimensionnement nécessaire
-  if (graphe->nb_noeuds >= graphe->capacite_noeuds)
-  {
-    int ancienne_cap = graphe->capacite_noeuds;
-    int nouvelle_capacite = graphe->capacite_noeuds * 2;
-
-    // 1. Realloc Noeuds
-    Noeud *nouveaux_noeuds =
-        (Noeud *)realloc(graphe->noeuds, nouvelle_capacite * sizeof(Noeud));
-    if (!nouveaux_noeuds)
-    {
-      perror("Erreur de redimensionnement des nœuds");
-      return;
-    }
-    graphe->noeuds = nouveaux_noeuds;
-
-    // Init nouveaux noeuds
-    for (int i = ancienne_cap; i < nouvelle_capacite; i++)
-    {
-      graphe->noeuds[i].id = -1;
-      graphe->noeuds[i].aretes = NULL;
-      strcpy(graphe->noeuds[i].nom, "");
-    }
-
-    // 2. Realloc Matrice
-    if (graphe->matrice_adjacence)
-    {
-      float **nouvelle_matrice = (float **)realloc(
-          graphe->matrice_adjacence, nouvelle_capacite * sizeof(float *));
-      if (nouvelle_matrice)
-      {
-        graphe->matrice_adjacence = nouvelle_matrice;
-        // Allouer les nouvelles lignes
-        for (int i = ancienne_cap; i < nouvelle_capacite; i++)
-        {
-          graphe->matrice_adjacence[i] =
-              (float *)malloc(nouvelle_capacite * sizeof(float));
-          for (int j = 0; j < nouvelle_capacite; j++)
-            graphe->matrice_adjacence[i][j] = -1.0;
+        // Allocation de la ligne de la matrice
+        g->matrice_adjacence[i] = (float*)malloc(nb_noeuds * sizeof(float));
+        for (int j = 0; j < nb_noeuds; j++) {
+            // Utilisation de -1.0 ou une constante INFINI pour Dijkstra
+            g->matrice_adjacence[i][j] = -1.0; 
         }
-        // Realloc les anciennes lignes pour agrandir les colonnes
-        for (int i = 0; i < ancienne_cap; i++)
-        {
-          float *nouvelle_ligne = (float *)realloc(
-              graphe->matrice_adjacence[i], nouvelle_capacite * sizeof(float));
-          if (nouvelle_ligne)
-          {
-            graphe->matrice_adjacence[i] = nouvelle_ligne;
-            for (int j = ancienne_cap; j < nouvelle_capacite; j++)
-              graphe->matrice_adjacence[i][j] = -1.0;
-          }
+    }
+    
+    return g;
+}
+
+void ajouter_arete(Graphe* g, int src, int dest, float lat, float bp, float cout, int sec) {
+    if (!g || src < 0 || src >= g->nb_noeuds || dest < 0 || dest >= g->nb_noeuds) {
+        return;
+    }
+
+    // 1. Mise à jour de la LISTE D'ADJACENCE (Aller)
+    // On utilise g->noeuds[src].aretes conformément à ton typedef
+    Arete* nouvelle_aller = creer_arete(dest, lat, bp, cout, sec);
+    nouvelle_aller->suivant = g->noeuds[src].aretes;
+    g->noeuds[src].aretes = nouvelle_aller;
+
+    // 2. Mise à jour de la MATRICE D'ADJACENCE (Aller)
+    g->matrice_adjacence[src][dest] = lat;
+
+    // 3. Cas du graphe non-orienté (Retour)
+    // On crée l'arête symétrique pour que la communication soit bidirectionnelle
+    Arete* nouvelle_retour = creer_arete(src, lat, bp, cout, sec);
+    nouvelle_retour->suivant = g->noeuds[dest].aretes;
+    g->noeuds[dest].aretes = nouvelle_retour;
+
+    // Symétrie dans la matrice
+    g->matrice_adjacence[dest][src] = lat;
+}
+
+void agrandir_graphe(Graphe* g, int nouvelle_capacite) {
+    if (!g || nouvelle_capacite <= g->nb_noeuds) return;
+
+    // 1. Redimensionner le tableau de nœuds (Utilisation de 'noeuds')
+    Noeud* temp_noeuds = realloc(g->noeuds, nouvelle_capacite * sizeof(Noeud));
+    if (temp_noeuds == NULL) return; // Échec de réallocation
+    g->noeuds = temp_noeuds;
+
+    // 2. Redimensionner le tableau de pointeurs de la matrice
+    float** temp_matrice = realloc(g->matrice_adjacence, nouvelle_capacite * sizeof(float*));
+    if (temp_matrice == NULL) return;
+    g->matrice_adjacence = temp_matrice;
+    
+    for (int i = 0; i < nouvelle_capacite; i++) {
+        if (i >= g->nb_noeuds) {
+            // Pour les nouveaux nœuds : Initialisation complète
+            g->noeuds[i].id = i;
+            sprintf(g->noeuds[i].nom, "Routeur_%d", i);
+            g->noeuds[i].aretes = NULL; // Utilisation de 'aretes'
+
+            // Nouvelle ligne dans la matrice
+            g->matrice_adjacence[i] = malloc(nouvelle_capacite * sizeof(float));
+            for (int j = 0; j < nouvelle_capacite; j++) {
+                g->matrice_adjacence[i][j] = -1.0;
+            }
+        } else {
+            // Pour les nœuds existants : Agrandir la ligne et initialiser les nouvelles colonnes
+            float* temp_ligne = realloc(g->matrice_adjacence[i], nouvelle_capacite * sizeof(float));
+            if (temp_ligne) {
+                g->matrice_adjacence[i] = temp_ligne;
+                for (int j = g->nb_noeuds; j < nouvelle_capacite; j++) {
+                    g->matrice_adjacence[i][j] = -1.0;
+                }
+            }
         }
-      }
     }
-
-    graphe->capacite_noeuds = nouvelle_capacite;
-  }
-
-  // Vérifions si l'ID existe déjà pour éviter les doublons
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    if (graphe->noeuds[i].id == id)
-    {
-      strncpy(graphe->noeuds[i].nom, nom, 49);
-      graphe->noeuds[i].nom[49] = '\0';
-      return;
-    }
-  }
-
-  int index = graphe->nb_noeuds;
-  graphe->noeuds[index].id = id;
-  strncpy(graphe->noeuds[index].nom, nom, 49);
-  graphe->noeuds[index].nom[49] = '\0';
-  graphe->noeuds[index].aretes = NULL;
-
-  graphe->nb_noeuds++;
+    
+    g->nb_noeuds = nouvelle_capacite;
+    printf("[DEBUG] Graphe agrandi a %d noeuds.\n", nouvelle_capacite);
 }
 
-void ajouter_arete(Graphe *graphe, int source, int destination, float latence,
-                   float bande_passante, float cout, int securite)
-{
-  if (!graphe)
-    return;
+void supprimer_arete(Graphe* g, int src, int dest) {
+    if (!g || src < 0 || src >= g->nb_noeuds || dest < 0 || dest >= g->nb_noeuds) return;
 
-  // Trouver l'index du nœud source
-  int index_source = -1;
-  int index_dest = -1;
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    if (graphe->noeuds[i].id == source)
-      index_source = i;
-    if (graphe->noeuds[i].id == destination)
-      index_dest = i;
-  }
+    // --- 1. Nettoyage dans la Liste d'Adjacence ---
+    Arete* curr = g->noeuds[src].aretes;
+    Arete* prev = NULL;
 
-  if (index_source == -1)
-  {
-    fprintf(stderr, "Erreur: Nœud source %d inexistant.\n", source);
-    return;
-  }
-
-  // Création de l'arête (Liste Adjacence)
-  Arete *nouvelle_arete = (Arete *)malloc(sizeof(Arete));
-  if (!nouvelle_arete)
-  {
-    perror("Erreur allocation arête");
-    return;
-  }
-  nouvelle_arete->destination = destination;
-  nouvelle_arete->latence = latence;
-  nouvelle_arete->bande_passante = bande_passante;
-  nouvelle_arete->cout = cout;
-  nouvelle_arete->securite = securite;
-
-  nouvelle_arete->suivant = graphe->noeuds[index_source].aretes;
-  graphe->noeuds[index_source].aretes = nouvelle_arete;
-
-  // Mise à jour Matrice Adjacence (Stockage Latence par défaut dans la matrice
-  // simple)
-  if (graphe->matrice_adjacence && index_source < graphe->capacite_noeuds &&
-      index_dest != -1 && index_dest < graphe->capacite_noeuds)
-  {
-    graphe->matrice_adjacence[index_source][index_dest] = latence;
-  }
-
-  // Si non orienté, ajouter l'arête inverse
-  if (!graphe->est_oriente)
-  {
-    if (index_dest != -1)
-    {
-      Arete *arete_inverse = (Arete *)malloc(sizeof(Arete));
-      if (arete_inverse)
-      {
-        arete_inverse->destination = source;
-        arete_inverse->latence = latence;
-        arete_inverse->bande_passante = bande_passante;
-        arete_inverse->cout = cout;
-        arete_inverse->securite = securite;
-        arete_inverse->suivant = graphe->noeuds[index_dest].aretes;
-        graphe->noeuds[index_dest].aretes = arete_inverse;
-
-        // Matrice symétrique
-        if (graphe->matrice_adjacence && index_dest < graphe->capacite_noeuds &&
-            index_source < graphe->capacite_noeuds)
-        {
-          graphe->matrice_adjacence[index_dest][index_source] = latence;
+    while (curr != NULL) {
+        if (curr->destination == dest) {
+            if (prev == NULL) g->noeuds[src].aretes = curr->suivant;
+            else prev->suivant = curr->suivant;
+            free(curr);
+            break; // Sortir dès qu'on a trouvé et supprimé
         }
-      }
-    }
-  }
-}
-
-/**
- * @brief Supprime une arête entre deux nœuds
- * @complexity O(V + deg(source))
- */
-int supprimer_arete(Graphe *graphe, int source, int destination)
-{
-  if (!graphe)
-    return 0;
-
-  // Trouver l'index du nœud source
-  int index_source = -1;
-  int index_dest = -1;
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    if (graphe->noeuds[i].id == source)
-      index_source = i;
-    if (graphe->noeuds[i].id == destination)
-      index_dest = i;
-  }
-
-  if (index_source == -1)
-    return 0;
-
-  // Supprimer l'arête source -> destination
-  Arete *prev = NULL;
-  Arete *curr = graphe->noeuds[index_source].aretes;
-  int trouve = 0;
-
-  while (curr)
-  {
-    if (curr->destination == destination)
-    {
-      if (prev)
-        prev->suivant = curr->suivant;
-      else
-        graphe->noeuds[index_source].aretes = curr->suivant;
-      free(curr);
-      trouve = 1;
-      break;
-    }
-    prev = curr;
-    curr = curr->suivant;
-  }
-
-  // Mise à jour matrice d'adjacence
-  if (trouve && graphe->matrice_adjacence && index_dest != -1 &&
-      index_source < graphe->capacite_noeuds &&
-      index_dest < graphe->capacite_noeuds)
-  {
-    graphe->matrice_adjacence[index_source][index_dest] = -1.0;
-  }
-
-  // Si non orienté, supprimer aussi l'arête inverse
-  if (!graphe->est_oriente && index_dest != -1)
-  {
-    prev = NULL;
-    curr = graphe->noeuds[index_dest].aretes;
-    while (curr)
-    {
-      if (curr->destination == source)
-      {
-        if (prev)
-          prev->suivant = curr->suivant;
-        else
-          graphe->noeuds[index_dest].aretes = curr->suivant;
-        free(curr);
-        break;
-      }
-      prev = curr;
-      curr = curr->suivant;
-    }
-    // Matrice symétrique
-    if (graphe->matrice_adjacence)
-    {
-      graphe->matrice_adjacence[index_dest][index_source] = -1.0;
-    }
-  }
-
-  return trouve;
-}
-
-/**
- * @brief Supprime un nœud du graphe et toutes ses arêtes
- * @complexity O(V + E)
- */
-int supprimer_noeud(Graphe *graphe, int id)
-{
-  if (!graphe)
-    return 0;
-
-  // Trouver l'index du nœud à supprimer
-  int index = -1;
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    if (graphe->noeuds[i].id == id)
-    {
-      index = i;
-      break;
-    }
-  }
-
-  if (index == -1)
-    return 0;
-
-  // 1. Libérer toutes les arêtes sortantes du nœud
-  Arete *courante = graphe->noeuds[index].aretes;
-  while (courante)
-  {
-    Arete *a_supprimer = courante;
-    courante = courante->suivant;
-    free(a_supprimer);
-  }
-
-  // 2. Supprimer toutes les arêtes entrantes (des autres nœuds vers ce nœud)
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    if (i == index)
-      continue;
-
-    Arete *prev = NULL;
-    Arete *curr = graphe->noeuds[i].aretes;
-    while (curr)
-    {
-      if (curr->destination == id)
-      {
-        Arete *a_supprimer = curr;
-        if (prev)
-          prev->suivant = curr->suivant;
-        else
-          graphe->noeuds[i].aretes = curr->suivant;
-        curr = curr->suivant;
-        free(a_supprimer);
-      }
-      else
-      {
         prev = curr;
         curr = curr->suivant;
-      }
     }
-  }
 
-  // 3. Mise à jour matrice d'adjacence (mettre ligne et colonne à -1)
-  if (graphe->matrice_adjacence && index < graphe->capacite_noeuds)
-  {
-    for (int j = 0; j < graphe->capacite_noeuds; j++)
-    {
-      graphe->matrice_adjacence[index][j] = -1.0;
-      graphe->matrice_adjacence[j][index] = -1.0;
+    // --- 2. Nettoyage dans la Matrice ---
+    if (g->matrice_adjacence && g->matrice_adjacence[src]) {
+        g->matrice_adjacence[src][dest] = -1.0;
     }
-  }
-
-  // 4. Décaler les nœuds suivants dans le tableau
-  for (int i = index; i < graphe->nb_noeuds - 1; i++)
-  {
-    graphe->noeuds[i] = graphe->noeuds[i + 1];
-  }
-
-  // 5. Réinitialiser le dernier emplacement
-  graphe->noeuds[graphe->nb_noeuds - 1].id = -1;
-  graphe->noeuds[graphe->nb_noeuds - 1].aretes = NULL;
-  strcpy(graphe->noeuds[graphe->nb_noeuds - 1].nom, "");
-
-  graphe->nb_noeuds--;
-
-  return 1;
 }
 
-void afficher_graphe(const Graphe *graphe)
-{
-  if (!graphe)
-    return;
-  printf("=== Affichage du Graphe (%d nœuds) ===\n", graphe->nb_noeuds);
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-  {
-    printf("Nœud %d (%s) :", graphe->noeuds[i].id, graphe->noeuds[i].nom);
-    Arete *courante = graphe->noeuds[i].aretes;
-    while (courante)
-    {
-      printf(" -> [Dest:%d | Lat:%.1f | BP:%.1f | Séc:%d]",
-             courante->destination, courante->latence, courante->bande_passante,
-             courante->securite);
-      courante = courante->suivant;
+void supprimer_noeud(Graphe* g, int id_noeud) {
+    // 1. VERIFICATION DE SECURITE (Indispensable !)
+    if (!g || id_noeud < 0 || id_noeud >= g->nb_noeuds) {
+        printf("\033[1;31m[ERREUR]\033[0m ID %d invalide (Max: %d).\n", id_noeud, g->nb_noeuds - 1);
+        return;
     }
-    printf("\n");
-  }
-  printf("========================================\n");
+
+    // 2. Supprimer les arêtes SORTANTES
+    Arete* curr = g->noeuds[id_noeud].aretes;
+    while (curr) {
+        Arete* temp = curr;
+        curr = curr->suivant;
+        free(temp);
+    }
+    g->noeuds[id_noeud].aretes = NULL; // On marque le noeud comme vide
+
+    // 3. Supprimer les arêtes ENTRANTES (venant des autres nœuds)
+    // On nettoie la matrice ET les listes d'adjacence des voisins
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        if (i == id_noeud) continue;
+        
+        // Supprime le lien dans la liste d'adjacence du voisin i vers id_noeud
+        supprimer_arete(g, i, id_noeud);
+        
+        // Nettoie la matrice
+        g->matrice_adjacence[id_noeud][i] = -1.0;
+        g->matrice_adjacence[i][id_noeud] = -1.0;
+    }
+    
+    printf("\033[1;32m[SUCCES]\033[0m Le noeud %d a ete neutralise.\n", id_noeud);
+}
+Graphe* charger_depuis_fichier(const char* nom_fichier) {
+    // Vérification du nom de fichier
+    if (!nom_fichier || strlen(nom_fichier) == 0) {
+        printf("\033[1;31m[ERREUR]\033[0m Nom de fichier invalide.\n");
+        return NULL;
+    }
+
+    // Vérifier l'extension (.txt uniquement)
+    const char* ext = strrchr(nom_fichier, '.');
+    if (!ext || strcmp(ext, ".txt") != 0) {
+        printf("\033[1;31m[ERREUR]\033[0m Nom de fichier invalide.\n");
+        return NULL;
+    }
+
+    FILE* f = fopen(nom_fichier, "r");
+    if (!f) {
+        printf("\033[1;31m[ERREUR]\033[0m Impossible d'ouvrir le fichier %s\n", nom_fichier);
+        return NULL;
+    }
+
+    char ligne[256];
+    int nb_noeuds = 0;
+    Graphe* g = NULL;
+
+    while (fgets(ligne, sizeof(ligne), f)) {
+        if (ligne[0] == '#' || ligne[0] == '\n') continue; // Ignore commentaires
+
+        if (strncmp(ligne, "NB_NOEUDS", 9) == 0) {
+            sscanf(ligne, "NB_NOEUDS %d", &nb_noeuds);
+            g = creer_graphe(nb_noeuds);
+        } 
+        else if (strncmp(ligne, "ARETE", 5) == 0) {
+            int s, d, sec;
+            float lat, bp, ct;
+            sscanf(ligne, "ARETE %d %d %f %f %f %d", &s, &d, &lat, &bp, &ct, &sec);
+            if (g) ajouter_arete(g, s, d, lat, bp, ct, sec);
+        }
+        // On ignore les lignes "NOEUD" car ton graphe utilise les indices (0-99)
+    }
+
+    fclose(f);
+    return g;
+}
+
+void afficher_graphe_complet(Graphe* g) {
+    if (!g) {
+        printf("\n\033[1;31m[ERREUR]\033[0m Aucun graphe a afficher.\n");
+        return;
+    }
+
+    printf("\n\033[1;34m============================================================================\033[0m\n");
+    printf("           AFFICHAGE INTEGRAL DE LA TOPOLOGIE RESEAU (Full Metrics)           \n");
+    printf("\033[1;34m============================================================================\033[0m\n");
+
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        printf("\033[1;33mNoeud [%02d]\033[0m | ", i);
+        
+        Arete* a = g->noeuds[i].aretes; 
+        
+        if (a == NULL) {
+            printf("\033[0;90m(Aucune connexion active)\033[0m");
+        } else {
+            while (a) {
+                // Formatage enrichi : Dest (Latence | BP | Coût | Sécurité)
+                // On utilise des couleurs différentes pour chaque métrique pour la lisibilité
+                printf("\033[1;32m-> [%d]\033[0m(\033[0;36mL:%.1f\033[0m, \033[0;35mBP:%.0f\033[0m, \033[0;33mC:%.1f\033[0m, \033[0;31mS:%d\033[0m)", 
+                        a->destination, 
+                        a->latence, 
+                        a->bande_passante, 
+                        a->cout, 
+                        a->securite);
+                
+                if (a->suivant) printf(" | ");
+                a = a->suivant;
+            }
+        }
+        printf("\n");
+        
+        // Pagination
+        if ((i + 1) % 20 == 0 && i != g->nb_noeuds - 1) {
+            printf("\n\033[0;90m--- Appuyez sur Entree pour voir la suite (%d/%d) ---\033[0m", i+1, g->nb_noeuds);
+            getchar(); 
+            getchar(); 
+        }
+    }
+    printf("\033[1;34m============================================================================\033[0m\n\n");
+}
+
+void analyser_connectivite(Graphe* g, int source) {
+    if (!g || source < 0 || source >= g->nb_noeuds) return;
+
+    // 1. Initialisation du tableau de visite
+    int* visite = calloc(g->nb_noeuds, sizeof(int));
+    int* file = malloc(g->nb_noeuds * sizeof(int));
+    int tete = 0, queue = 0;
+
+    // 2. Algorithme BFS
+    visite[source] = 1;
+    file[queue++] = source;
+
+    while (tete < queue) {
+        int actuel = file[tete++]; // 'actuel' est maintenant bien utilisé
+        
+        // Correction : tab_noeuds -> noeuds | liste_adjacence -> aretes
+        Arete* a = g->noeuds[actuel].aretes; 
+        
+        while (a) {
+            if (!visite[a->destination]) {
+                visite[a->destination] = 1;
+                file[queue++] = a->destination;
+            }
+            a = a->suivant;
+        }
+    }
+
+    // 3. Vérification du résultat
+    int nb_atteints = queue;
+    printf("\n--- ANALYSE DE CONNECTIVITE (Source: %d) ---\n", source);
+    printf("Noeuds accessibles : %d / %d\n", nb_atteints, g->nb_noeuds);
+
+    if (nb_atteints == g->nb_noeuds) {
+        printf("Statut : \033[1;32mRESEAU FORTEMENT CONNECTE\033[0m\n");
+    } else {
+        printf("Statut : \033[1;31mRESEAU FRAGMENTE\033[0m (%d noeuds isoles)\n", g->nb_noeuds - nb_atteints);
+    }
+
+    free(visite);
+    free(file);
+}
+void analyser_topologie(Graphe* g) {
+    if (!g) return;
+
+    float lat_totale = 0;
+    int nb_links = 0;
+
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        // Correction : tab_noeuds -> noeuds | liste_adjacence -> aretes
+        Arete* a = g->noeuds[i].aretes;
+        while (a) {
+            lat_totale += a->latence;
+            nb_links++;
+            a = a->suivant;
+        }
+    }
+
+    float moyenne = (nb_links > 0) ? lat_totale / nb_links : 0;
+    
+    // Calcul de la densité : (nb_liens / nb_liens_possibles)
+    // Pour un graphe non-orienté, nb_liens_max = n*(n-1)/2
+    // Ici on divise nb_links par 2 car chaque arête est comptée deux fois (Aller/Retour)
+    float densite = 0;
+    if (g->nb_noeuds > 1) {
+        densite = (float)(nb_links / 2.0) / ((g->nb_noeuds * (g->nb_noeuds - 1)) / 2.0);
+    }
+
+    printf("\n\033[1;34m--- ANALYSE TOPOLOGIQUE ---\033[0m\n");
+    printf("Nombre de noeuds : %d\n", g->nb_noeuds);
+    printf("Nombre de liaisons : %d\n", nb_links / 2); // /2 car bidirectionnel
+    printf("Latence moyenne : %.2f ms\n", moyenne);
+    printf("Densite du reseau : %.2f%%\n", densite * 100);
+
+    // Diagnostic intelligent
+    if (moyenne < 5.0 && densite > 0.5) {
+        printf("Detection : \033[1;32mDATACENTER / LAN HAUTE DENSITE\033[0m\n");
+    } else if (moyenne > 20.0) {
+        printf("Detection : \033[1;33mWAN (Internet / Large Echelle)\033[0m\n");
+    } else {
+        printf("Detection : \033[1;36mTOPOLOGIE MIXTE / IoT\033[0m\n");
+    }
+    printf("---------------------------\n");
+}
+
+void mesurer_performance_memoire(Graphe* g) {
+    if (!g) return;
+
+    // 1. Taille de la structure de base + tableau de Noeuds
+    size_t sz = sizeof(Graphe) + (g->nb_noeuds * sizeof(Noeud));
+
+    // 2. Taille de la Matrice d'Adjacence (Module 1)
+    // Elle prend (N * sizeof(float*)) + (N * N * sizeof(float))
+    sz += (g->nb_noeuds * sizeof(float*)); 
+    sz += (g->nb_noeuds * g->nb_noeuds * sizeof(float));
+
+    // 3. Taille des listes d'adjacence
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        // Correction : tab_noeuds -> noeuds | liste_adjacence -> aretes
+        Arete* a = g->noeuds[i].aretes;
+        while (a) { 
+            sz += sizeof(Arete); 
+            a = a->suivant; 
+        }
+    }
+
+    printf("\n\033[1;35m--- PERFORMANCE RAM ---\033[0m\n");
+    printf("Occupation totale : %.2f Ko\n", (float)sz / 1024);
+    
+    // Un petit plus pour ton rapport :
+    if (sz > 1024 * 1024) {
+        printf("Statut : \033[1;31mCONSOMMATION ELEVEE (%.2f Mo)\033[0m\n", (float)sz / (1024 * 1024));
+    } else {
+        printf("Statut : \033[1;32mOPTIMISE\033[0m\n");
+    }
+}
+
+void liberer_graphe(Graphe* g) {
+    if (!g) return;
+
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        // Libération manuelle de la liste d'arêtes (évite l'erreur liberer_liste)
+        Arete* curr = g->noeuds[i].aretes;
+        while (curr) {
+            Arete* temp = curr;
+            curr = curr->suivant;
+            free(temp);
+        }
+        
+        // Libération des lignes de la matrice
+        if (g->matrice_adjacence[i]) {
+            free(g->matrice_adjacence[i]);
+        }
+    }
+
+    free(g->matrice_adjacence);
+    free(g->noeuds);
+    free(g);
+    printf("\033[1;32m[CLEAN]\033[0m Memoire du graphe liberee.\n");
+}
+
+void sauvegarder_graphe(Graphe* g, const char* nom_fichier) {
+    if (!g) return;
+    FILE* f = fopen(nom_fichier, "w");
+    if (!f) { printf("Erreur sauvegarde.\n"); return; }
+
+    fprintf(f, "%d\n", g->nb_noeuds);
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        Arete* a = g->noeuds[i].aretes;
+        while (a) {
+            // Sauvegarde au format : src dest latence cout bp securite
+            // On ne sauvegarde que i < a->destination pour éviter les doublons dans le fichier
+            if (i < a->destination) {
+                fprintf(f, "%d %d %.2f %.2f %.2f %d\n", 
+                        i, a->destination, a->latence, a->cout, a->bande_passante, a->securite);
+            }
+            a = a->suivant;
+        }
+    }
+    fclose(f);
+    printf("\n\033[1;32m[SUCCES]\033[0m Topologie sauvegardee dans %s\n", nom_fichier);
+}
+
+void generer_dot(Graphe* g, const char* nom_fichier) {
+    if (!g) return;
+    FILE* f = fopen(nom_fichier, "w");
+    if (!f) return;
+
+    fprintf(f, "graph G {\n    node [shape=circle, style=filled, fillcolor=lightblue];\n");
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        Arete* a = g->noeuds[i].aretes;
+        while (a) {
+            if (i < a->destination) { // Pour un graphe non-orienté, une seule ligne suffit
+                fprintf(f, "    %d -- %d [label=\"%.1f ms\"];\n", i, a->destination, a->latence);
+            }
+            a = a->suivant;
+        }
+    }
+
+    for (int i = 0; i < g->nb_noeuds; i++) {
+        // Si le noeud n'a plus aucune arête, on le met en évidence
+        if (g->noeuds[i].aretes == NULL) {
+            fprintf(f, "    %d [fillcolor=tomato, label=\"Routeur %d (OFF)\"];\n", i, i);
+        } else {
+            fprintf(f, "    %d [label=\"Routeur %d\"];\n", i, i);
+        }
+        
+        Arete* a = g->noeuds[i].aretes;
+        while (a) {
+            if (i < a->destination) {
+                fprintf(f, "    %d -- %d [label=\"%.1f ms\", len=2.0];\n", i, a->destination, a->latence);
+            }
+            a = a->suivant;
+        }
+    }
+    fprintf(f, "}\n");
+    fclose(f);
+    printf("\033[1;32m[OK]\033[0m Fichier %s genere. Utilisez 'dot -Tpng %s -o reseau.png' pour visualiser.\n", nom_fichier, nom_fichier);
+}
+
+void generer_aretes_fichier(FILE *f, int start, int end, int target_start, int target_end, 
+                            float lat_min, float lat_max, float bw_min, float bw_max, int rel_min) {
+    for (int i = start; i <= end; i++) {
+        int cible = target_start + (rand() % (target_end - target_start + 1));
+        float lat = lat_min + ((float)rand() / RAND_MAX) * (lat_max - lat_min);
+        float bw = bw_min + ((float)rand() / RAND_MAX) * (bw_max - bw_min);
+        fprintf(f, "ARETE %d %d %.2f %.2f %.2f %d\n", i, cible, lat, bw, bw * 0.1, rel_min + (rand() % 3));
+        
+        if ((rand() % 100) < 30) {
+            int cible2 = target_start + (rand() % (target_end - target_start + 1));
+            if (cible2 != cible) {
+                fprintf(f, "ARETE %d %d %.2f %.2f %.2f %d\n", i, cible2, lat * 1.2, bw * 0.8, bw * 0.08, rel_min);
+            }
+        }
+    }
+}
+
+void generer_reseau_geant() {
+    srand(time(NULL));
+    FILE *f = fopen("data/reseau_geant.txt", "w");
+    if (!f) {
+        printf("\033[1;31m[ERREUR]\033[0m Impossible de créer le fichier dans le dossier data/.\n");
+        return;
+    }
+
+    fprintf(f, "NB_NOEUDS %d\nORIENTE 0\n\n", TOTAL_NOEUDS_GEN);
+
+    for (int i = 0; i < TOTAL_NOEUDS_GEN; i++) {
+        if (i < 20) fprintf(f, "NOEUD %d Backbone_Router_%d\n", i, i);
+        else if (i < 150) fprintf(f, "NOEUD %d DC_Server_%d\n", i, i);
+        else if (i < 250) fprintf(f, "NOEUD %d Campus_AP_%d\n", i, i);
+        else if (i < 400) fprintf(f, "NOEUD %d Industrial_Sensor_%d\n", i, i);
+        else fprintf(f, "NOEUD %d SmartCity_5G_%d\n", i, i);
+    }
+
+    // Connexions
+    for (int i = 0; i < 20; i++) 
+        for (int j = i + 1; j < 5; j++) 
+            fprintf(f, "ARETE %d %d %.2f 100000.0 5000.0 10\n", i, j, 0.5 + (rand() % 2));
+
+    generer_aretes_fichier(f, 20, 149, 0, 19, 1.0, 3.0, 40000.0, 80000.0, 9);
+    generer_aretes_fichier(f, 150, 249, 20, 149, 5.0, 15.0, 1000.0, 5000.0, 7);
+    generer_aretes_fichier(f, 250, 399, 20, 80, 15.0, 30.0, 100.0, 500.0, 6);
+    generer_aretes_fichier(f, 400, 549, 0, 19, 10.0, 40.0, 1000.0, 2000.0, 8);
+
+    fclose(f);
+    printf("\033[1;32m[SUCCES]\033[0m Fichier 'data/reseau_geant.txt' généré.\n");
 }

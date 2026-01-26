@@ -1,58 +1,42 @@
+# Nom de l'exécutable final
+TARGET = NetFlow_Sim.exe
+
+# Compilateur
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -g
-LDFLAGS = 
 
-SRC_DIR = src
-OBJ_DIR = obj
-BIN_DIR = bin
-TEST_DIR = tests
+# Options de compilation 
+# -lm : lie la bibliothèque mathématique (pour sqrt, pow, etc.)
+# -g  : ajoute les symboles de débogage (utile pour gdb ou valgrind)
+CFLAGS = -Isrc -Wall -g
+LDFLAGS = -lm
 
-# Lister les sources du programme principal (tout sauf le main pour les tests si besoin, mais ici on sépare)
-# Pour éviter de lier main.o avec tests_unitaires.o (conflit de main)
-SRCS_LIB = $(filter-out $(SRC_DIR)/main.c, $(wildcard $(SRC_DIR)/*.c))
-OBJS_LIB = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS_LIB))
+# Liste de TOUS les fichiers sources
+SRCS = src/main.c \
+       src/graphe.c \
+       src/dijkstra.c \
+       src/securite.c \
+       src/backtracking.c \
+       src/utils.c \
+       src/liste_chainee.c \
+       src/simulation.c
 
-# Objet main
-OBJ_MAIN = $(OBJ_DIR)/main.o
+# Transformation automatique des .c en .o
+OBJS = $(SRCS:.c=.o)
 
-# Cible principale
-TARGET = $(BIN_DIR)/netflow_optimizer
-
-# Tests
-TEST_SRC = $(TEST_DIR)/tests_unitaires.c
-TEST_OBJ = $(OBJ_DIR)/tests_unitaires.o
-TEST_TARGET = $(BIN_DIR)/tests_runner
-
-.PHONY: all clean debug test
-
+# Règle par défaut
 all: $(TARGET)
 
-$(TARGET): $(OBJS_LIB) $(OBJ_MAIN)
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(LDFLAGS) -o $@ $^
+# Liaison des fichiers objets
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
-$(OBJ_DIR)/main.o: $(SRC_DIR)/main.c
-	@mkdir -p $(OBJ_DIR)
+# Règle pour compiler chaque fichier .c en .o
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# Cible de test
-test: $(TEST_TARGET)
-	./$(TEST_TARGET)
-
-$(TEST_TARGET): $(OBJS_LIB) $(TEST_OBJ)
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(LDFLAGS) -o $@ $^
-
-$(OBJ_DIR)/tests_unitaires.o: $(TEST_SRC)
-	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
+# Règle pour nettoyer
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -f src/*.o $(TARGET)
 
-debug: CFLAGS += -DDEBUG
-debug: all
+# Empêche les conflits avec des fichiers nommés 'clean' ou 'all'
+.PHONY: all clean

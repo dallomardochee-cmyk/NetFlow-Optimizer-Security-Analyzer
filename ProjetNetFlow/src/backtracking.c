@@ -1,167 +1,83 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "graphe.h"
 #include "backtracking.h"
-#include <float.h>
 
-// Variables globales pour stocker le meilleur chemin trouvé pendant la
-// récursion
-static float meilleur_latence_trouvee = FLT_MAX;
-static int *meilleur_chemin = NULL;
-static int meilleure_longueur = 0;
+// Variables pour stocker la meilleure solution trouvée
+// ========== VARIABLES GLOBALES ==========
+float meilleure_latence = 1e9;
+int meilleur_trajet[100];
+int taille_meilleur = 0;
+int trouve = 0;
 
-static int *chemin_actuel = NULL;
-static int *visite = NULL;
+// Ajout d'une variable globale pour le rapport
+long nb_iterations = 0;
+float meilleur_cout = 0; // Pour afficher le vrai coût final
 
-void copier_meilleur_chemin(int longueur) {
-  if (meilleur_chemin)
-    free(meilleur_chemin);
-  meilleur_chemin = (int *)malloc(longueur * sizeof(int));
-  for (int i = 0; i < longueur; i++)
-    meilleur_chemin[i] = chemin_actuel[i];
-  meilleure_longueur = longueur;
-}
+void backtracking_recursive(Graphe* g, int u, int dest, float bp_min, float cout_max, 
+                            int sec_min, float cout_acc, float lat_acc, 
+                            int* visite, int* chemin, int etape) {
+    nb_iterations++;
 
-void dfs_backtracking(const Graphe *g, int u, int dest, Contraintes c,
-                      float latence_acc, float cout_acc, int profondeur) {
-  // Élagage (Pruning)
-  if (latence_acc >= meilleur_latence_trouvee)
-    return;
-  if (c.max_latence > 0 && latence_acc > c.max_latence)
-    return;
-  if (cout_acc > c.max_cout)
-    return;
+    // 1. ÉLAGAGE (Pruning)
+    // On coupe si latence déjà moins bonne OU si on dépasse le budget
+    if (lat_acc >= meilleure_latence || cout_acc > cout_max) return;
 
-  // Verification Noeuds Interdits (Si le nœud actuel est interdit)
-  for (int i = 0; i < c.nb_interdits; i++) {
-    if (u == c.noeuds_interdits[i])
-      return;
-  }
+    // 2. CONDITION DE RÉUSSITE
+    if (u == dest) {
+        trouve = 1;
+        meilleure_latence = lat_acc;
+        meilleur_cout = cout_acc; // On stocke le coût réel
+        taille_meilleur = etape;
+        for (int i = 0; i < etape; i++) meilleur_trajet[i] = chemin[i];
+        return;
+    }
 
-  // init chemin actuel
-  chemin_actuel[profondeur - 1] = u;
-  visite[u] = 1;
+    visite[u] = 1;
 
-  // Si destination atteinte
-  if (u == dest) {
-    // Vérifier si tous les obligatoires sont passés
-    int tout_vu = 1;
-    for (int i = 0; i < c.nb_obligatoires; i++) {
-      int obl = c.noeuds_obligatoires[i];
-      int vu = 0;
-      for (int j = 0; j < profondeur; j++) {
-        if (chemin_actuel[j] == obl) {
-          vu = 1;
-          break;
+    // 3. EXPLORATION
+    for (Arete* a = g->noeuds[u].aretes; a; a = a->suivant) {
+        int v = a->destination;
+
+        // On remplace le '3' fixe par 'sec_min'
+        if (!visite[v] && a->bande_passante >= bp_min && 
+            (cout_acc + a->cout) <= cout_max && a->securite >= sec_min) {
+            
+            chemin[etape] = v;
+            backtracking_recursive(g, v, dest, bp_min, cout_max, sec_min,
+                                   cout_acc + a->cout, lat_acc + a->latence, 
+                                   visite, chemin, etape + 1);
         }
-      }
-      if (!vu) {
-        tout_vu = 0;
-        break;
-      }
     }
 
-    if (tout_vu && latence_acc < meilleur_latence_trouvee) {
-      meilleur_latence_trouvee = latence_acc;
-      copier_meilleur_chemin(profondeur);
-    }
-    visite[u] = 0; // Backtrack important ici aussi
-    return;
-  }
-
-  // Trouver index u
-  int index_u = -1;
-  for (int i = 0; i < g->nb_noeuds; i++)
-    if (g->noeuds[i].id == u) {
-      index_u = i;
-      break;
-    }
-
-  if (index_u != -1) {
-    Arete *arete = g->noeuds[index_u].aretes;
-    while (arete) {
-      int v = arete->destination;
-
-      // Vérifier contraintes locales (BP, Secu)
-      if (!visite[v] && arete->bande_passante >= c.min_bande_passante &&
-          arete->securite >= c.min_securite) {
-
-        dfs_backtracking(g, v, dest, c, latence_acc + arete->latence,
-                         cout_acc + arete->cout, profondeur + 1);
-      }
-      arete = arete->suivant;
-    }
-  }
-
-  visite[u] = 0; // Backtrack
+    // 4. BACKTRACK
+    visite[u] = 0;
 }
 
-ResultatChemin *recherche_contrainte(const Graphe *graphe, int source,
-                                     int destination, Contraintes contraintes) {
-  if (!graphe)
-    return NULL;
+// ========== FONCTION PRINCIPALE DE BACKTRACKING ==========
+void lancer_backtracking(Graphe* g, int src, int dest, float bp_min, float cout_max, int sec_min) {
+    if (g == NULL || src < 0 || src >= g->nb_noeuds) return;
 
-  // Reset globales
-  meilleur_latence_trouvee = FLT_MAX;
-  if (meilleur_chemin) {
-    free(meilleur_chemin);
-    meilleur_chemin = NULL;
-  }
-  meilleure_longueur = 0;
+    int* visite = calloc(g->nb_noeuds, sizeof(int));
+    int* chemin = malloc(g->nb_noeuds * sizeof(int));
+    
+    nb_iterations = 0;
+    trouve = 0;
+    meilleure_latence = 1e9;
+    chemin[0] = src;
 
-  // Allocation buffers temporaires
-  // Taille max chemin = nb_noeuds. Attention ID vs index.
-  // Supposons IDs petits pour ce tableau visite, sinon map.
-  int max_id = 0;
-  for (int i = 0; i < graphe->nb_noeuds; i++)
-    if (graphe->noeuds[i].id > max_id)
-      max_id = graphe->noeuds[i].id;
-  int taille = max_id + 1;
+    backtracking_recursive(g, src, dest, bp_min, cout_max, sec_min, 0.0, 0.0, visite, chemin, 1);
 
-  visite = (int *)calloc(taille, sizeof(int));
-  chemin_actuel = (int *)malloc(taille * sizeof(int)); // Au pire tout le graphe
+    if (trouve) {
+        printf("[SUCCES] Itérations : %ld\n", nb_iterations);
+        printf("Trajet : ");
+        for (int i = 0; i < taille_meilleur; i++) 
+            printf("%d%s", meilleur_trajet[i], (i == taille_meilleur-1 ? "" : " -> "));
+        printf("\nLatence : %.2f ms | Coût Réel : %.2f (Budget : %.2f)\n", meilleure_latence, meilleur_cout, cout_max);
+    } else {
+       printf("[ECHEC] Aucun chemin (Secu >= %d, BP >= %.1f, Budget <= %.1f)\n", sec_min, bp_min, cout_max);
+    }
 
-  // Lancer DFS
-  chemin_actuel[0] = source;
-  dfs_backtracking(graphe, source, destination, contraintes, 0.0, 0.0, 1);
-
-  // Nettoyage tmp
-  free(visite);
-  free(chemin_actuel);
-
-  if (meilleure_longueur == 0)
-    return NULL; // Pas de chemin trouvé
-
-  // Convertir en ResultatChemin
-  // ResultatChemin stocke prédecesseurs. C'est un format un peu inadapté pour
-  // un simple chemin linéaire stocké ainsi Mais on va adapter : precesseur[v] =
-  // u.
-  ResultatChemin *res = (ResultatChemin *)malloc(sizeof(ResultatChemin));
-  res->nb_noeuds = taille;
-  res->distances = (float *)malloc(taille * sizeof(float));
-  res->precesseurs = (int *)malloc(taille * sizeof(int));
-  res->source = source;
-
-  for (int i = 0; i < taille; i++) {
-    res->distances[i] = FLT_MAX;
-    res->precesseurs[i] = -1;
-  }
-
-  // Remplir distance finale
-  res->distances[destination] = meilleur_latence_trouvee;
-
-  // Remplir prédecesseurs
-  for (int i = 0; i < meilleure_longueur - 1; i++) {
-    int u = meilleur_chemin[i];
-    int v = meilleur_chemin[i + 1];
-    res->precesseurs[v] = u;
-  }
-
-  // Le chemin est stocké dans meilleur_chemin, qui est linear.
-  // afficher_chemin utilise les prédecesseurs. Donc ça marche.
-
-  // free meilleur_chemin car on a copié dans prédecesseurs ? non,
-  // meilleur_chemin est statique ou duplicata? meilleur_chemin a été malloué
-  // dans copier_meilleur_chemin. Il faut le free.
-  free(meilleur_chemin);
-  meilleur_chemin = NULL; // important pour leak
-
-  return res;
+    free(visite);
+    free(chemin);
 }
