@@ -461,7 +461,12 @@ void generer_aretes_fichier(FILE *f, int start, int end, int target_start, int t
     }
 }
 
-void generer_reseau_geant() {
+void generer_reseau_geant(int taille_reseau) {
+    if (taille_reseau <= 0) {
+        printf("\033[1;31m[ERREUR]\033[0m La taille du réseau doit être positive.\n");
+        return;
+    }
+
     srand(time(NULL));
     FILE *f = fopen("data/reseau_geant.txt", "w");
     if (!f) {
@@ -469,26 +474,44 @@ void generer_reseau_geant() {
         return;
     }
 
-    fprintf(f, "NB_NOEUDS %d\nORIENTE 0\n\n", TOTAL_NOEUDS_GEN);
+    fprintf(f, "NB_NOEUDS %d\nORIENTE 0\n\n", taille_reseau);
 
-    for (int i = 0; i < TOTAL_NOEUDS_GEN; i++) {
-        if (i < 20) fprintf(f, "NOEUD %d Backbone_Router_%d\n", i, i);
-        else if (i < 150) fprintf(f, "NOEUD %d DC_Server_%d\n", i, i);
-        else if (i < 250) fprintf(f, "NOEUD %d Campus_AP_%d\n", i, i);
-        else if (i < 400) fprintf(f, "NOEUD %d Industrial_Sensor_%d\n", i, i);
+    // Répartition proportionnelle selon la taille
+    int backbone = (int)(taille_reseau * 0.04);      // 4% Backbone
+    int datacenter = (int)(taille_reseau * 0.27);    // 27% DataCenter
+    int campus = (int)(taille_reseau * 0.18);        // 18% Campus
+    int industrial = (int)(taille_reseau * 0.27);    // 27% Industrial
+    // int smartcity = taille_reseau - backbone - datacenter - campus - industrial; // Reste
+
+    for (int i = 0; i < taille_reseau; i++) {
+        if (i < backbone) fprintf(f, "NOEUD %d Backbone_Router_%d\n", i, i);
+        else if (i < backbone + datacenter) fprintf(f, "NOEUD %d DC_Server_%d\n", i, i);
+        else if (i < backbone + datacenter + campus) fprintf(f, "NOEUD %d Campus_AP_%d\n", i, i);
+        else if (i < backbone + datacenter + campus + industrial) fprintf(f, "NOEUD %d Industrial_Sensor_%d\n", i, i);
         else fprintf(f, "NOEUD %d SmartCity_5G_%d\n", i, i);
     }
 
-    // Connexions
-    for (int i = 0; i < 20; i++) 
-        for (int j = i + 1; j < 5; j++) 
+    // Connexions Backbone (mailles)
+    for (int i = 0; i < backbone && i < taille_reseau; i++) {
+        for (int j = i + 1; j < backbone && j < taille_reseau && j < i + 5; j++) {
             fprintf(f, "ARETE %d %d %.2f 100000.0 5000.0 10\n", i, j, 0.5 + (rand() % 2));
+        }
+    }
 
-    generer_aretes_fichier(f, 20, 149, 0, 19, 1.0, 3.0, 40000.0, 80000.0, 9);
-    generer_aretes_fichier(f, 150, 249, 20, 149, 5.0, 15.0, 1000.0, 5000.0, 7);
-    generer_aretes_fichier(f, 250, 399, 20, 80, 15.0, 30.0, 100.0, 500.0, 6);
-    generer_aretes_fichier(f, 400, 549, 0, 19, 10.0, 40.0, 1000.0, 2000.0, 8);
+    // Connexions entre les couches
+    if (backbone > 0 && backbone + datacenter <= taille_reseau) {
+        generer_aretes_fichier(f, backbone, backbone + datacenter - 1, 0, backbone - 1, 1.0, 3.0, 40000.0, 80000.0, 9);
+    }
+    if (backbone + datacenter < taille_reseau && backbone + datacenter + campus <= taille_reseau) {
+        generer_aretes_fichier(f, backbone + datacenter, backbone + datacenter + campus - 1, backbone, backbone + datacenter - 1, 5.0, 15.0, 1000.0, 5000.0, 7);
+    }
+    if (backbone + datacenter + campus < taille_reseau && backbone + datacenter + campus + industrial <= taille_reseau) {
+        generer_aretes_fichier(f, backbone + datacenter + campus, backbone + datacenter + campus + industrial - 1, backbone, backbone + (int)(datacenter * 0.5), 15.0, 30.0, 100.0, 500.0, 6);
+    }
+    if (backbone + datacenter + campus + industrial < taille_reseau) {
+        generer_aretes_fichier(f, backbone + datacenter + campus + industrial, taille_reseau - 1, 0, backbone - 1, 10.0, 40.0, 1000.0, 2000.0, 8);
+    }
 
     fclose(f);
-    printf("\033[1;32m[SUCCES]\033[0m Fichier 'data/reseau_geant.txt' généré.\n");
+    printf("\033[1;32m[SUCCES]\033[0m Fichier 'data/reseau_geant.txt' généré avec %d nœuds.\n", taille_reseau);
 }

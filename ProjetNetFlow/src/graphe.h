@@ -47,7 +47,7 @@ void analyser_topologie(Graphe* g);
 void mesurer_performance_memoire(Graphe* g); 
 
 // Prototype de la fonction de génération
-void generer_reseau_geant();
+void generer_reseau_geant(int taille_reseau);
 void generer_aretes_fichier(FILE *f, int start, int end, int target_start, int target_end, 
                             float lat_min, float lat_max, float bw_min, float bw_max, int rel_min);
 

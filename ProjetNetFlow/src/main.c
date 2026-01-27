@@ -243,9 +243,17 @@ int main() {
                 } else printf("Erreur : Chargez un reseau.\n");
                 break;
             // Generer un reseau geant
-            case 15:
-                generer_reseau_geant();
+            case 15: {
+                int taille;
+                printf("Entrez la taille du reseau a generer : ");
+                if (scanf("%d", &taille) != 1) {
+                    printf("Erreur : Entrez un nombre valide.\n");
+                    while (getchar() != '\n'); // Nettoie le buffer
+                } else {
+                    generer_reseau_geant(taille);
+                }
                 break;
+            }
         }
     }
 
